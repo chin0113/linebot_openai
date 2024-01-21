@@ -49,7 +49,8 @@ def callback():
 def handle_message(event):
     body = request.get_data(as_text=True)
     json_data = json.loads(body)
-    msg = event.message.text
+    # msg = event.message.text
+    msg = json_data['events'][0]['message']['text']
     try:
         tp = event.message.type
         # tk = json_data['events'][0]['replyToken']
@@ -58,6 +59,7 @@ def handle_message(event):
             # msg = json_data['events'][0]['message']['text']
             # line_bot_api.reply_message(tk,TextSendMessage(msg))
             line_bot_api.reply_message(event.reply_token, TextSendMessage(msg))
+            print(json_data)
             
         if tp == 'sticker':
             stickerId = json_data['events'][0]['message']['stickerId'] # 取得 stickerId

@@ -27,15 +27,14 @@ handler = WebhookHandler(os.getenv('CHANNEL_SECRET'))
 # OPENAI API Key初始化設定
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
-# get X-Line-Signature header value
-signature = request.headers['X-Line-Signature']
-# get request body as text
-body = request.get_data(as_text=True)
-json_data = json.loads(body)
 
 # 監聽所有來自 /callback 的 Post Request
 @app.route("/callback", methods=['POST'])
 def callback():
+    # get X-Line-Signature header value
+    signature = request.headers['X-Line-Signature']
+    # get request body as text
+    body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)
     # handle webhook body
     try:
@@ -48,6 +47,8 @@ def callback():
 # 處理訊息
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
+    body = request.get_data(as_text=True)
+    json_data = json.loads(body)
     msg = event.message.text
     try:
         tp = event.message.type

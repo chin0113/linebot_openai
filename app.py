@@ -26,15 +26,6 @@ handler = WebhookHandler(os.getenv('CHANNEL_SECRET'))
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 
-def GPT_response(text):
-    # 接收回應
-    response = openai.Completion.create(model="gpt-3.5-turbo", prompt=text, temperature=0.5, max_tokens=500)
-    print(response)
-    # 重組回應
-    answer = response['choices'][0]['text'].replace('。','')
-    return answer
-
-
 # 監聽所有來自 /callback 的 Post Request
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -42,6 +33,7 @@ def callback():
     signature = request.headers['X-Line-Signature']
     # get request body as text
     body = request.get_data(as_text=True)
+    json_data = json.loads(body)
     app.logger.info("Request body: " + body)
     # handle webhook body
     try:
@@ -56,12 +48,23 @@ def callback():
 def handle_message(event):
     msg = event.message.text
     try:
-        GPT_answer = GPT_response(msg)
-        print(GPT_answer)
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(GPT_answer))
+        tp = json_data['events'][0]['message']['type']
+        # tk = json_data['events'][0]['replyToken']
+        
+        if tp == 'text':
+            # msg = json_data['events'][0]['message']['text']
+            # line_bot_api.reply_message(tk,TextSendMessage(msg))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(msg))
+            
+        if tp == 'sticker':
+            stickerId = json_data['events'][0]['message']['stickerId'] # 取得 stickerId
+            packageId = json_data['events'][0]['message']['packageId'] # 取得 packageId
+            sticker_message = StickerSendMessage(sticker_id=stickerId, package_id=packageId) # 設定要回傳的表情貼圖
+            line_bot_api.reply_message(event.reply_token, sticker_message)
+        
     except:
         print(traceback.format_exc())
-        line_bot_api.reply_message(event.reply_token, TextSendMessage('你所使用的OPENAI API key額度可能已經超過，請於後台Log內確認錯誤訊息'))
+        # line_bot_api.reply_message(event.reply_token, TextSendMessage('你所使用的OPENAI API key額度可能已經超過，請於後台Log內確認錯誤訊息'))
         
 
 @handler.add(PostbackEvent)

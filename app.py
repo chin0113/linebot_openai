@@ -66,6 +66,7 @@ def handle_message(event):
             packageId = json_data['events'][0]['message']['packageId'] # 取得 packageId
             sticker_message = StickerSendMessage(sticker_id=stickerId, package_id=packageId) # 設定要回傳的表情貼圖
             line_bot_api.reply_message(event.reply_token, sticker_message)
+            print(json_data)
         
     except:
         print(traceback.format_exc())

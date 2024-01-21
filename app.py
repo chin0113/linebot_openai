@@ -59,8 +59,8 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(msg))
             
         if tp == 'sticker':
-            stickerId = event.message.stickerId # 取得 stickerId
-            packageId = event.message.packageId # 取得 packageId
+            stickerId = message.stickerId # 取得 stickerId
+            packageId = message.packageId # 取得 packageId
             sticker_message = StickerSendMessage(sticker_id=stickerId, package_id=packageId) # 設定要回傳的表情貼圖
             line_bot_api.reply_message(event.reply_token, sticker_message)
         

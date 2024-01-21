@@ -59,7 +59,7 @@ def handle_message(event):
         
 
 @handler.add(MessageEvent, message=StickerMessage)
-def handle_message(event):
+def handle_sticker_message(event):
     try:
         stickerId = event.message.stickerId
         packageId = event.message.packageId

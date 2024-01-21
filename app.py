@@ -27,15 +27,15 @@ handler = WebhookHandler(os.getenv('CHANNEL_SECRET'))
 # OPENAI API Key初始化設定
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
+# get X-Line-Signature header value
+signature = request.headers['X-Line-Signature']
+# get request body as text
+body = request.get_data(as_text=True)
+json_data = json.loads(body)
 
 # 監聽所有來自 /callback 的 Post Request
 @app.route("/callback", methods=['POST'])
 def callback():
-    # get X-Line-Signature header value
-    signature = request.headers['X-Line-Signature']
-    # get request body as text
-    body = request.get_data(as_text=True)
-    # json_data = json.loads(body)
     app.logger.info("Request body: " + body)
     # handle webhook body
     try:
@@ -59,8 +59,8 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(msg))
             
         if tp == 'sticker':
-            stickerId = message.stickerId # 取得 stickerId
-            packageId = message.packageId # 取得 packageId
+            stickerId = json_data['events'][0]['message']['stickerId'] # 取得 stickerId
+            packageId = json_data['events'][0]['message']['packageId'] # 取得 packageId
             sticker_message = StickerSendMessage(sticker_id=stickerId, package_id=packageId) # 設定要回傳的表情貼圖
             line_bot_api.reply_message(event.reply_token, sticker_message)
         

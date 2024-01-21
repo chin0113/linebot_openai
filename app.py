@@ -47,32 +47,30 @@ def callback():
 # 處理訊息
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    body = request.get_data(as_text=True)
-    json_data = json.loads(body)
-    # msg = event.message.text
-    msg = json_data['events'][0]['message']['text']
+    # body = request.get_data(as_text=True)
+    # json_data = json.loads(body)
+    msg = event.message.text
     try:
         tp = event.message.type
-        # tk = json_data['events'][0]['replyToken']
-        
-        if tp == 'text':
-            # msg = json_data['events'][0]['message']['text']
-            # line_bot_api.reply_message(tk,TextSendMessage(msg))
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(msg))
-            print(json_data)
-            
-        if tp == 'sticker':
-            stickerId = json_data['events'][0]['message']['stickerId'] # 取得 stickerId
-            packageId = json_data['events'][0]['message']['packageId'] # 取得 packageId
-            sticker_message = StickerSendMessage(sticker_id=stickerId, package_id=packageId) # 設定要回傳的表情貼圖
-            line_bot_api.reply_message(event.reply_token, sticker_message)
-            print(json_data)
-        
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(msg))
     except:
         print(traceback.format_exc())
         # line_bot_api.reply_message(event.reply_token, TextSendMessage('你所使用的OPENAI API key額度可能已經超過，請於後台Log內確認錯誤訊息'))
         
 
+@handler.add(MessageEvent, message=StickerMessage)
+def handle_message(event):
+    try:
+        stickerId = event.message.stickerId
+        packageId = event.message.packageId
+        # stickerId = json_data['events'][0]['message']['stickerId'] # 取得 stickerId
+        # packageId = json_data['events'][0]['message']['packageId'] # 取得 packageId
+        sticker_message = StickerSendMessage(sticker_id=stickerId, package_id=packageId) # 設定要回傳的表情貼圖
+        line_bot_api.reply_message(event.reply_token, sticker_message)
+    except:
+        print(traceback.format_exc())
+        
+        
 @handler.add(PostbackEvent)
 def handle_message(event):
     print(event.postback.data)

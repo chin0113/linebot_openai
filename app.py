@@ -35,7 +35,7 @@ def callback():
     signature = request.headers['X-Line-Signature']
     # get request body as text
     body = request.get_data(as_text=True)
-    json_data = json.loads(body)
+    # json_data = json.loads(body)
     app.logger.info("Request body: " + body)
     # handle webhook body
     try:
@@ -50,7 +50,7 @@ def callback():
 def handle_message(event):
     msg = event.message.text
     try:
-        tp = json_data['events'][0]['message']['type']
+        tp = event.message.type
         # tk = json_data['events'][0]['replyToken']
         
         if tp == 'text':
@@ -59,8 +59,8 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(msg))
             
         if tp == 'sticker':
-            stickerId = json_data['events'][0]['message']['stickerId'] # 取得 stickerId
-            packageId = json_data['events'][0]['message']['packageId'] # 取得 packageId
+            stickerId = event.message.stickerId # 取得 stickerId
+            packageId = event.message.packageId # 取得 packageId
             sticker_message = StickerSendMessage(sticker_id=stickerId, package_id=packageId) # 設定要回傳的表情貼圖
             line_bot_api.reply_message(event.reply_token, sticker_message)
         

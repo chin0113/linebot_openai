@@ -11,7 +11,7 @@ app = Flask(__name__)
 def linebot():
     body = request.get_data(as_text=True)
     json_data = json.loads(body)
-    print(json_data)
+    # print(json_data)
     
     try:
         line_bot_api = LineBotApi(os.getenv('CHANNEL_ACCESS_TOKEN'))
@@ -21,11 +21,11 @@ def linebot():
         signature = request.headers['X-Line-Signature']
         handler.handle(body, signature)
         
-        msg = request.args.get('msg')
-        if msg != None:
+        push_msg = request.args.get('msg')
+        if push_msg != None:
         # 如果有 msg 參數，觸發 LINE Message API 的 push_message 方法
-            line_bot_api.push_message('U2574668b48e37ef5423509b4e2355321', TextSendMessage(text=msg))
-            return msg
+            line_bot_api.push_message('U2574668b48e37ef5423509b4e2355321', TextSendMessage(text=push_msg))
+            return push_msg
         else:
             return 'OK'
         

@@ -7,13 +7,17 @@ from linebot.models import MessageEvent, TextMessage, TextSendMessage, StickerSe
 
 app = Flask(__name__)
 
-@app.route("/", methods=['POST'])
+@app.route("/callback", methods=['POST'])
 def linebot():
     body = request.get_data(as_text=True)
     json_data = json.loads(body)
     try:
+        # static_tmp_path = os.path.join(os.path.dirname(__file__), 'static', 'tmp')
+        
         line_bot_api = LineBotApi(os.getenv('CHANNEL_ACCESS_TOKEN'))
         handler = WebhookHandler(os.getenv('CHANNEL_SECRET'))
+        # openai.api_key = os.getenv('OPENAI_API_KEY')
+        
         signature = request.headers['X-Line-Signature']
         handler.handle(body, signature)
         

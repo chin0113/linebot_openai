@@ -7,7 +7,7 @@ from linebot.models import *
 
 app = Flask(__name__)
 
-@app.route("/callback", methods=['POST'])
+@app.route("/callback")
 def linebot():
     body = request.get_data(as_text=True)
     json_data = json.loads(body)
@@ -21,14 +21,14 @@ def linebot():
         signature = request.headers['X-Line-Signature']
         handler.handle(body, signature)
         
-        push_msg = request.args.get('msg')
-        if push_msg != None:
-        # 如果有 msg 參數，觸發 LINE Message API 的 push_message 方法
-            line_bot_api.push_message('U2574668b48e37ef5423509b4e2355321', TextSendMessage(text=push_msg))
-            return push_msg
-        else:
-            return 'OK'
-        
+        msg = request.args.get('msg')
+        if msg == '1':
+            # 如果 msg 等於 1，發送文字訊息
+            line_bot_api.push_message('U2574668b48e37ef5423509b4e2355321', TextSendMessage(text='hello'))
+        elif msg == '2':
+            # 如果 msg 等於 2，發送表情貼圖
+            line_bot_api.push_message('U2574668b48e37ef5423509b4e2355321', StickerSendMessage(package_id=1, sticker_id=2))
+      
         tp = json_data['events'][0]['message']['type']
         tk = json_data['events'][0]['replyToken']      # 取得 reply token
         

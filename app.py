@@ -26,23 +26,17 @@ def linebot():
         
         if tp == 'text':
             line_bot_api.push_message('U2574668b48e37ef5423509b4e2355321', TemplateSendMessage(
-                alt_text='ButtonsTemplate',
-                template=ButtonsTemplate(
-                    thumbnail_image_url='https://steam.oxxostudio.tw/download/python/line-template-message-demo.jpg',
-                    title='OXXO.STUDIO',
-                    text='這是按鈕樣板',
+                alt_text='ConfirmTemplate',
+                template=ConfirmTemplate(
+                    text='你好嗎？',
                     actions=[
-                        PostbackAction(
-                            label='postback',
-                            data='發送 postback'
+                        MessageAction(
+                            label='好喔',
+                            text='好喔'
                         ),
                         MessageAction(
-                            label='說 hello',
-                            text='hello'
-                        ),
-                        URIAction(
-                            label='前往 STEAM 教育學習網',
-                            uri='https://steam.oxxostudio.tw'
+                            label='不好喔',
+                            text='不好喔'
                         )
                     ]
                 )

@@ -21,7 +21,13 @@ def linebot():
         signature = request.headers['X-Line-Signature']
         handler.handle(body, signature)
         
-        line_bot_api.push_message('U2574668b48e37ef5423509b4e2355321', TextSendMessage(text='Hello World!!!'))
+        msg = request.args.get('msg')
+        if msg != None:
+        # 如果有 msg 參數，觸發 LINE Message API 的 push_message 方法
+            line_bot_api.push_message('U2574668b48e37ef5423509b4e2355321', TextSendMessage(text=msg))
+            return msg
+        else:
+            return 'OK'
         
         tp = json_data['events'][0]['message']['type']
         tk = json_data['events'][0]['replyToken']      # 取得 reply token

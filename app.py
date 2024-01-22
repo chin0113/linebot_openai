@@ -11,6 +11,8 @@ app = Flask(__name__)
 def linebot():
     body = request.get_data(as_text=True)
     json_data = json.loads(body)
+    print(json_data)
+    
     try:
         line_bot_api = LineBotApi(os.getenv('CHANNEL_ACCESS_TOKEN'))
         handler = WebhookHandler(os.getenv('CHANNEL_SECRET'))
@@ -18,6 +20,8 @@ def linebot():
         
         signature = request.headers['X-Line-Signature']
         handler.handle(body, signature)
+        
+        # line_bot_api.push_message('你的 User ID', TextSendMessage(text='Hello World!!!'))
         
         tp = json_data['events'][0]['message']['type']
         tk = json_data['events'][0]['replyToken']      # 取得 reply token

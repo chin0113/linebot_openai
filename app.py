@@ -64,12 +64,12 @@ def handle_sticker_message(event):
         body = request.get_data(as_text=True)
         json_data = json.loads(body)
         print(json_data)
-        # stickerId = event.message.stickerId
-        # packageId = event.message.packageId
+        stickerId = events.message.stickerId
+        packageId = events.message.packageId
         # stickerId = json_data['events'][0]['message']['stickerId'] # 取得 stickerId
         # packageId = json_data['events'][0]['message']['packageId'] # 取得 packageId
-        # sticker_message = StickerSendMessage(sticker_id=stickerId, package_id=packageId) # 設定要回傳的表情貼圖
-        # line_bot_api.reply_message(event.reply_token, sticker_message)
+        sticker_message = StickerSendMessage(sticker_id=stickerId, package_id=packageId) # 設定要回傳的表情貼圖
+        line_bot_api.reply_message(event.reply_token, sticker_message)
     except:
         print(traceback.format_exc())
         

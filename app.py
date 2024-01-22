@@ -12,6 +12,21 @@ from email.mime.text import MIMEText
 
 app = Flask(__name__)
 
+def sendEmail(txt, source, fileName, email, pwd):
+    msg = MIMEMultipart()
+    attach_file = MIMEApplication(source, Name=fileName)  # 附加檔案
+    msg.attach(attach_file)
+    msg['Subject'] = txt   # 標題
+    msg['From'] = email    # 給誰 ( 通常是給自己 )
+    msg['To'] = email      # 寄件者
+    smtp = smtplib.SMTP('smtp.gmail.com', 587)
+    smtp.ehlo()
+    smtp.starttls()
+    smtp.login(email, pwd) # 使用應用程式密碼登入
+    status = smtp.send_message(msg)
+    print(status)
+    smtp.quit()
+    
 @app.route("/callback", methods=['POST'])
 def linebot():
     body = request.get_data(as_text=True)
@@ -41,24 +56,11 @@ def linebot():
         else:
             reply = '你傳的不是文字或圖片呦～'
         print(reply)
-    except:
-        print(body)                                            # 如果發生錯誤，印出收到的內容
+    except Exception as error:
+        print(error)                                            # 如果發生錯誤，印出收到的內容
     return 'OK'   
 
-def sendEmail(txt, source, fileName, email, pwd):
-    msg = MIMEMultipart()
-    attach_file = MIMEApplication(source, Name=fileName)  # 附加檔案
-    msg.attach(attach_file)
-    msg['Subject'] = txt   # 標題
-    msg['From'] = email    # 給誰 ( 通常是給自己 )
-    msg['To'] = email      # 寄件者
-    smtp = smtplib.SMTP('smtp.gmail.com', 587)
-    smtp.ehlo()
-    smtp.starttls()
-    smtp.login(email, pwd) # 使用應用程式密碼登入
-    status = smtp.send_message(msg)
-    print(status)
-    smtp.quit()
+
     
 if __name__ == "__main__":
     app.run()

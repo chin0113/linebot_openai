@@ -51,7 +51,7 @@ def linebot():
         elif tp == 'image':
             msgID = json_data['events'][0]['message']['id']  # 取得訊息 id
             message_content = line_bot_api.get_message_content(msgID)  # 根據訊息 ID 取得訊息內容
-            sendEmail('LINE 傳圖片來囉！', message_content.content, f'{msgID}.jpg', 'chean0847@msn.com', 'c721204520alu5293')
+            sendEmail('LINE 傳圖片來囉！', message_content.content, f'{msgID}.jpg', 'chean0847@gmail.com', 'c721204520alu5293')
             reply = '圖片儲存完成！'                             # 設定要回傳的訊息
         else:
             reply = '你傳的不是文字或圖片呦～'

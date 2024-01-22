@@ -5,7 +5,12 @@ from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, StickerSendMessage
 
-def linebot(request):
+app = Flask(__name__)
+
+@app.route("/", methods=['POST'])
+def linebot():
+    body = request.get_data(as_text=True)
+    json_data = json.loads(body)
     try:
         line_bot_api = LineBotApi(os.getenv('CHANNEL_ACCESS_TOKEN'))
         handler = WebhookHandler(os.getenv('CHANNEL_SECRET'))
@@ -23,3 +28,6 @@ def linebot(request):
     except:
         print(json_data)
     return 'OK'
+
+if __name__ == "__main__":
+    app.run()

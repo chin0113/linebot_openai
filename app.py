@@ -21,7 +21,7 @@ def linebot():
         signature = request.headers['X-Line-Signature']
         handler.handle(body, signature)
         
-        # line_bot_api.push_message('你的 User ID', TextSendMessage(text='Hello World!!!'))
+        line_bot_api.push_message('U2574668b48e37ef5423509b4e2355321', TextSendMessage(text='Hello World!!!'))
         
         tp = json_data['events'][0]['message']['type']
         tk = json_data['events'][0]['replyToken']      # 取得 reply token

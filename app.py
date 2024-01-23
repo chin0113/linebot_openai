@@ -53,15 +53,15 @@ def linebot():
     }
 
 
-# 向指定網址發送 request
-req = requests.request(
-    "POST",
-    "https://test01-1fbw.onrender.com/callback",
-    headers=headers,
-    data=json.dumps(body).encode("utf-8"),
-)
-# 印出得到的結果
-print(req.text)
+    # 向指定網址發送 request
+    req = requests.request(
+        "POST",
+        "https://test01-1fbw.onrender.com/callback",
+        headers=headers,
+        data=json.dumps(body).encode("utf-8"),
+    )
+    # 印出得到的結果
+    print(req.text)
 
 
 if __name__ == "__main__":

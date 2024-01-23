@@ -56,7 +56,7 @@ def linebot():
     # 向指定網址發送 request
     req = requests.request(
         "POST",
-        "https://test01-1fbw.onrender.com/callback",
+        "https://api.line.me/v2/bot/richmenu",
         headers=headers,
         data=json.dumps(body).encode("utf-8"),
     )

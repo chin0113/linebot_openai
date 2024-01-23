@@ -29,10 +29,11 @@ def linebot():
         handler.handle(body, signature)
         
         line_bot_api.delete_rich_menu('richmenu-b04102d54c3ba22bada7e26fe26215b1')
+        line_bot_api.delete_rich_menu('richmenu-bbe5902cc4e8d577e8c0f55a8d3af91b')
         
-        if image_response.status_code == 200:
-            with BytesIO(image_response.content) as image_buffer:
-                line_bot_api.set_rich_menu_image('richmenu-bbe5902cc4e8d577e8c0f55a8d3af91b', 'image/jpeg', image_buffer)
+        #if image_response.status_code == 200:
+        #    with BytesIO(image_response.content) as image_buffer:
+        #        line_bot_api.set_rich_menu_image('richmenu-bbe5902cc4e8d577e8c0f55a8d3af91b', 'image/jpeg', image_buffer)
         
         tp = json_data["events"][0]["message"]["type"]
         tk = json_data["events"][0]["replyToken"]  # 取得 reply token

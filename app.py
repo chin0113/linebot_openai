@@ -18,9 +18,6 @@ def linebot():
     image_url = 'https://steam.oxxostudio.tw/download/python/line-rich-menu-switch-demo-a.jpg'
     image_response = requests.get(image_url)
     
-    if image_response.status_code == 200:
-        with BytesIO(image_response.content) as image_buffer:
-            line_bot_api.set_rich_menu_image('richmenu-bbe5902cc4e8d577e8c0f55a8d3af91b', 'image/jpeg', image_buffer)
     # print(json_data)
 
     try:
@@ -30,7 +27,11 @@ def linebot():
 
         signature = request.headers["X-Line-Signature"]
         handler.handle(body, signature)
-
+        
+        if image_response.status_code == 200:
+            with BytesIO(image_response.content) as image_buffer:
+                line_bot_api.set_rich_menu_image('richmenu-bbe5902cc4e8d577e8c0f55a8d3af91b', 'image/jpeg', image_buffer)
+        
         tp = json_data["events"][0]["message"]["type"]
         tk = json_data["events"][0]["replyToken"]  # 取得 reply token
 

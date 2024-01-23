@@ -27,10 +27,13 @@ def linebot():
 
         signature = request.headers["X-Line-Signature"]
         handler.handle(body, signature)
-        
-        if image_response.status_code == 200:
-            with BytesIO(image_response.content) as image_buffer:
-                line_bot_api.set_rich_menu_image('richmenu-bbe5902cc4e8d577e8c0f55a8d3af91b', 'image/jpeg', image_buffer)
+
+        rich_menu_list = line_bot_api.get_rich_menu_list()
+        for rich_menu in rich_menu_list:
+            print(rich_menu.rich_menu_id)
+        #if image_response.status_code == 200:
+        #    with BytesIO(image_response.content) as image_buffer:
+        #        line_bot_api.set_rich_menu_image('richmenu-bbe5902cc4e8d577e8c0f55a8d3af91b', 'image/jpeg', image_buffer)
         
         tp = json_data["events"][0]["message"]["type"]
         tk = json_data["events"][0]["replyToken"]  # 取得 reply token

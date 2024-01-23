@@ -1,5 +1,6 @@
 import json
 import os
+import requests
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
@@ -10,181 +11,57 @@ app = Flask(__name__)
 
 @app.route("/callback", methods=["POST"])
 def linebot():
-    body = request.get_data(as_text=True)
-    json_data = json.loads(body)
-    # print(json_data)
+    headers = {
+        "Authorization": "Bearer 1PlQGmb524SP8EccC6ZKIvX47fzf0u9pRZy0E4oCjx71d5gTBTy2U+JzlcfWMc10r4haBWSJHSv7kIE/cnRCnFM6VNtF3CMmTzVAR7n7xtlyiJs3RuuMXhPq+xOv4f9IJontF4iVL8amDiYMJlUxCAdB04t89/1O/w1cDnyilFU=",
+        "Content-Type": "application/json",
+    }
+    body = {
+        "size": {"width": 2500, "height": 1686},  # 設定尺寸
+        "selected": "true",  # 預設是否顯示
+        "name": "Richmenu demo",  # 選單名稱
+        "chatBarText": "Richmenu demo",  # 選單在 LINE 顯示的標題
+        "areas": [  # 選單內容
+            {
+                "bounds": {"x": 341, "y": 75, "width": 560, "height": 340},  # 選單位置與大小
+                "action": {"type": "message", "text": "電器"},  # 點擊後傳送文字
+            },
+            {
+                "bounds": {"x": 1434, "y": 229, "width": 930, "height": 340},
+                "action": {"type": "message", "text": "運動用品"},
+            },
+            {
+                "bounds": {"x": 122, "y": 641, "width": 560, "height": 340},
+                "action": {"type": "message", "text": "客服"},
+            },
+            {
+                "bounds": {"x": 1012, "y": 645, "width": 560, "height": 340},
+                "action": {"type": "message", "text": "餐廳"},
+            },
+            {
+                "bounds": {"x": 1813, "y": 677, "width": 560, "height": 340},
+                "action": {"type": "message", "text": "鞋子"},
+            },
+            {
+                "bounds": {"x": 423, "y": 1203, "width": 560, "height": 340},
+                "action": {"type": "message", "text": "美食"},
+            },
+            {
+                "bounds": {"x": 1581, "y": 1133, "width": 560, "height": 340},
+                "action": {"type": "message", "text": "衣服"},
+            },
+        ],
+    }
 
-    try:
-        line_bot_api = LineBotApi(os.getenv("CHANNEL_ACCESS_TOKEN"))
-        handler = WebhookHandler(os.getenv("CHANNEL_SECRET"))
-        # openai.api_key = os.getenv('OPENAI_API_KEY')
 
-        signature = request.headers["X-Line-Signature"]
-        handler.handle(body, signature)
-
-        tp = json_data["events"][0]["message"]["type"]
-        tk = json_data["events"][0]["replyToken"]  # 取得 reply token
-
-        if tp == "text":
-            line_bot_api.push_message(
-                "U2574668b48e37ef5423509b4e2355321",
-                FlexSendMessage(
-                    alt_text="hello",
-                    contents={
-                        "type": "bubble",
-                        "hero": {
-                            "type": "image",
-                            "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/01_1_cafe.png",
-                            "size": "full",
-                            "aspectRatio": "20:13",
-                            "aspectMode": "cover",
-                            "action": {"type": "uri", "uri": "http://linecorp.com/"},
-                        },
-                        "body": {
-                            "type": "box",
-                            "layout": "vertical",
-                            "contents": [
-                                {
-                                    "type": "text",
-                                    "text": "Brown Cafe",
-                                    "weight": "bold",
-                                    "size": "xl",
-                                },
-                                {
-                                    "type": "box",
-                                    "layout": "baseline",
-                                    "margin": "md",
-                                    "contents": [
-                                        {
-                                            "type": "icon",
-                                            "size": "sm",
-                                            "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png",
-                                        },
-                                        {
-                                            "type": "icon",
-                                            "size": "sm",
-                                            "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png",
-                                        },
-                                        {
-                                            "type": "icon",
-                                            "size": "sm",
-                                            "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png",
-                                        },
-                                        {
-                                            "type": "icon",
-                                            "size": "sm",
-                                            "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png",
-                                        },
-                                        {
-                                            "type": "icon",
-                                            "size": "sm",
-                                            "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gray_star_28.png",
-                                        },
-                                        {
-                                            "type": "text",
-                                            "text": "4.0",
-                                            "size": "sm",
-                                            "color": "#999999",
-                                            "margin": "md",
-                                            "flex": 0,
-                                        },
-                                    ],
-                                },
-                                {
-                                    "type": "box",
-                                    "layout": "vertical",
-                                    "margin": "lg",
-                                    "spacing": "sm",
-                                    "contents": [
-                                        {
-                                            "type": "box",
-                                            "layout": "baseline",
-                                            "spacing": "sm",
-                                            "contents": [
-                                                {
-                                                    "type": "text",
-                                                    "text": "Place",
-                                                    "color": "#aaaaaa",
-                                                    "size": "sm",
-                                                    "flex": 1,
-                                                },
-                                                {
-                                                    "type": "text",
-                                                    "text": "Miraina Tower, 4-1-6 Shinjuku, Tokyo",
-                                                    "wrap": True,
-                                                    "color": "#666666",
-                                                    "size": "sm",
-                                                    "flex": 5,
-                                                },
-                                            ],
-                                        },
-                                        {
-                                            "type": "box",
-                                            "layout": "baseline",
-                                            "spacing": "sm",
-                                            "contents": [
-                                                {
-                                                    "type": "text",
-                                                    "text": "Time",
-                                                    "color": "#aaaaaa",
-                                                    "size": "sm",
-                                                    "flex": 1,
-                                                },
-                                                {
-                                                    "type": "text",
-                                                    "text": "10:00 - 23:00",
-                                                    "wrap": True,
-                                                    "color": "#666666",
-                                                    "size": "sm",
-                                                    "flex": 5,
-                                                },
-                                            ],
-                                        },
-                                    ],
-                                },
-                            ],
-                        },
-                        "footer": {
-                            "type": "box",
-                            "layout": "vertical",
-                            "spacing": "sm",
-                            "contents": [
-                                {
-                                    "type": "button",
-                                    "style": "link",
-                                    "height": "sm",
-                                    "action": {
-                                        "type": "uri",
-                                        "label": "CALL",
-                                        "uri": "https://linecorp.com",
-                                    },
-                                },
-                                {
-                                    "type": "button",
-                                    "style": "link",
-                                    "height": "sm",
-                                    "action": {
-                                        "type": "uri",
-                                        "label": "WEBSITE",
-                                        "uri": "https://linecorp.com",
-                                    },
-                                },
-                                {
-                                    "type": "box",
-                                    "layout": "vertical",
-                                    "contents": [],
-                                    "margin": "sm",
-                                },
-                            ],
-                            "flex": 0,
-                        },
-                    },
-                ),
-            )
-
-    except Exception as error:
-        print(error)  # 如果發生錯誤，印出收到的內容
-    return "OK"
+# 向指定網址發送 request
+req = requests.request(
+    "POST",
+    "https://test01-1fbw.onrender.com/callback",
+    headers=headers,
+    data=json.dumps(body).encode("utf-8"),
+)
+# 印出得到的結果
+print(req.text)
 
 
 if __name__ == "__main__":

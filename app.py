@@ -64,7 +64,7 @@ def linebot():
                 e_url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/E-A0016-001?Authorization=CWA-DAEAB112-B74E-41D8-B951-527F63665E26"
                 e_data = requests.get(e_url)  # 爬取地震資訊網址
                 e_data_json = e_data.json()  # json 格式化訊息內容
-                eq = e_data_json["records"]["earthquake"]  # 取出地震資訊
+                eq = e_data_json["records"]["Earthquake"]  # 取出地震資訊
                 for i in eq:
                     loc = i["EarthquakeInfo"]["Epicenter"]["Location"]  # 地震地點
                     val = i["EarthquakeInfo"]["EarthquakeMagnitude"]["MagnitudeValue"]  # 地震規模

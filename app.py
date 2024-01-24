@@ -45,8 +45,12 @@ def linebot():
                 or json_data["events"][0]["message"]["text"] == "雷達回波"
             ):  # 如果是雷達回波圖相關的文字
                 # 傳送雷達回波圖 ( 加上時間戳記 )
+                radar_url = "https://opendata.cwa.gov.tw/fileapi/v1/opendataapi/O-A0058-003?Authorization=CWA-DAEAB112-B74E-41D8-B951-527F63665E26&format=JSON"
+                radar = requests.get(radar_url)        # 爬取資料
+                radar_json = radar.json()              # 使用 JSON 格式
+                radar_img = radar_json['cwaopendata']['dataset']['resource']['ProductURL']  # 取得圖片網址
                 reply_image(
-                    f"https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0058-005.png?{formatted_time}",
+                    radar_img,
                     tk,
                     os.getenv("CHANNEL_ACCESS_TOKEN"),
                 )
@@ -54,6 +58,7 @@ def linebot():
     except Exception as error:
         print(error)  # 如果發生錯誤，印出收到的內容
     return "OK"
+
 
 
 if __name__ == "__main__":
@@ -74,4 +79,3 @@ def reply_image(msg, rk, token):
         headers=headers,
         data=json.dumps(body).encode("utf-8"),
     )
-    print(formatted_time)

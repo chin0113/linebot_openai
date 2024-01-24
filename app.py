@@ -21,7 +21,6 @@ app = Flask(__name__)
 
 @app.route("/callback", methods=["POST"])
 def linebot():
-    
 
     body = request.get_data(as_text=True)
     json_data = json.loads(body)
@@ -38,6 +37,7 @@ def linebot():
 
         tp = json_data["events"][0]["message"]["type"]
         tk = json_data["events"][0]["replyToken"]  # 取得 reply token
+        user_id = json_data["events"][0]["source"]["userId"]
 
         if tp == "text":
 
@@ -47,19 +47,47 @@ def linebot():
             ):  # 如果是雷達回波圖相關的文字
                 # 傳送雷達回波圖 ( 加上時間戳記 )
                 radar_url = "https://opendata.cwa.gov.tw/fileapi/v1/opendataapi/O-A0058-003?Authorization=CWA-DAEAB112-B74E-41D8-B951-527F63665E26&format=JSON"
-                radar = requests.get(radar_url)        # 爬取資料
-                radar_json = radar.json()              # 使用 JSON 格式
-                radar_img = radar_json['cwaopendata']['dataset']['resource']['ProductURL']  # 取得圖片網址
+                radar = requests.get(radar_url)  # 爬取資料
+                radar_json = radar.json()  # 使用 JSON 格式
+                radar_img = radar_json["cwaopendata"]["dataset"]["resource"][
+                    "ProductURL"
+                ]  # 取得圖片網址
                 reply_image(
                     radar_img,
                     tk,
-                    os.getenv("CHANNEL_ACCESS_TOKEN"),
+                    os.getenv("CHANNEL_ACCESS_TOKEN")
+                )
+            elif (
+                json_data["events"][0]["message"]["text"] == "地震"
+                or json_data["events"][0]["message"]["text"] == "地震資訊"
+            ):
+                e_url = "https://opendata.cwa.gov.tw/fileapi/v1/opendataapi/E-A0016-001?Authorization=CWA-DAEAB112-B74E-41D8-B951-527F63665E26&format=JSON"
+                e_data = requests.get(url)  # 爬取地震資訊網址
+                e_data_json = e_data.json()  # json 格式化訊息內容
+                eq = e_data_json["records"]["earthquake"]  # 取出地震資訊
+                for i in eq:
+                    loc = i["earthquakeInfo"]["epiCenter"]["location"]  # 地震地點
+                    val = i["earthquakeInfo"]["magnitude"]["magnitudeValue"]  # 地震規模
+                    dep = i["earthquakeInfo"]["depth"]["value"]  # 地震深度
+                    eq_time = i["earthquakeInfo"]["originTime"]  # 地震時間
+                    img = i["reportImageURI"]  # 地震圖
+                    msg = [f"{loc}，芮氏規模 {val} 級，深度 {dep} 公里，發生時間 {eq_time}。", img]
+                    break  # 取出第一筆資料後就 break
+
+                push_message(
+                    msg[0],
+                    user_id,
+                    os.getenv("CHANNEL_ACCESS_TOKEN")
+                )
+                reply_image(
+                    msg[1], 
+                    tk, 
+                    os.getenv("CHANNEL_ACCESS_TOKEN")
                 )
 
     except Exception as error:
         print(error)  # 如果發生錯誤，印出收到的內容
     return "OK"
-
 
 
 if __name__ == "__main__":
@@ -71,12 +99,35 @@ def reply_image(msg, rk, token):
     body = {
         "replyToken": rk,
         "messages": [
-            {"type": "image", "originalContentUrl": msg + "?" + formatted_time, "previewImageUrl": msg + "?" + formatted_time}
-        ],
+            {
+                "type": "image",
+                "originalContentUrl": msg + "?" + formatted_time,
+                "previewImageUrl": msg + "?" + formatted_time,
+            }
+        ]
     }
     req = requests.request(
         "POST",
         "https://api.line.me/v2/bot/message/reply",
         headers=headers,
-        data=json.dumps(body).encode("utf-8"),
+        data=json.dumps(body).encode("utf-8")
+    )
+
+
+def push_message(msg, uid, token):
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    body = {
+        "to": uid, 
+        "messages": [
+            {
+                "type": "text", 
+                "text": msg
+            }
+        ]
+    }
+    req = requests.request(
+        "POST",
+        "https://api.line.me/v2/bot/message/push",
+        headers=headers,
+        data=json.dumps(body).encode("utf-8")
     )

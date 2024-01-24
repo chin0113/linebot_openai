@@ -61,16 +61,16 @@ def linebot():
                 json_data["events"][0]["message"]["text"] == "地震"
                 or json_data["events"][0]["message"]["text"] == "地震資訊"
             ):
-                e_url = "https://opendata.cwa.gov.tw/fileapi/v1/opendataapi/E-A0016-001?Authorization=CWA-DAEAB112-B74E-41D8-B951-527F63665E26&format=JSON"
+                e_url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/E-A0016-001?Authorization=CWA-DAEAB112-B74E-41D8-B951-527F63665E26"
                 e_data = requests.get(e_url)  # 爬取地震資訊網址
                 e_data_json = e_data.json()  # json 格式化訊息內容
                 eq = e_data_json["records"]["earthquake"]  # 取出地震資訊
                 for i in eq:
-                    loc = i["earthquakeInfo"]["epiCenter"]["location"]  # 地震地點
-                    val = i["earthquakeInfo"]["magnitude"]["magnitudeValue"]  # 地震規模
-                    dep = i["earthquakeInfo"]["depth"]["value"]  # 地震深度
-                    eq_time = i["earthquakeInfo"]["originTime"]  # 地震時間
-                    img = i["reportImageURI"]  # 地震圖
+                    loc = i["EarthquakeInfo"]["Epicenter"]["Location"]  # 地震地點
+                    val = i["EarthquakeInfo"]["EarthquakeMagnitude"]["MagnitudeValue"]  # 地震規模
+                    dep = i["EarthquakeInfo"]["FocalDepth"]  # 地震深度
+                    eq_time = i["EarthquakeInfo"]["OriginTime"]  # 地震時間
+                    img = i["ReportImageURI"]  # 地震圖
                     msg = [f"{loc}，芮氏規模 {val} 級，深度 {dep} 公里，發生時間 {eq_time}。", img]
                     break  # 取出第一筆資料後就 break
 

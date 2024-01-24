@@ -62,4 +62,4 @@ def reply_image(msg, rk, token):
         headers=headers,
         data=json.dumps(body).encode("utf-8"),
     )
-    print(req.text)
+    print(time.time_ns())

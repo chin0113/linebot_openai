@@ -14,10 +14,7 @@ app = Flask(__name__)
 def linebot():
     body = request.get_data(as_text=True)
     json_data = json.loads(body)
-    
-    image_url = 'https://steam.oxxostudio.tw/download/python/line-rich-menu-switch-demo-a.jpg'
-    image_response = requests.get(image_url)
-    
+
     # print(json_data)
 
     try:
@@ -27,16 +24,22 @@ def linebot():
 
         signature = request.headers["X-Line-Signature"]
         handler.handle(body, signature)
-        
-        line_bot_api.delete_rich_menu('richmenu-b04102d54c3ba22bada7e26fe26215b1')
-        line_bot_api.delete_rich_menu('richmenu-bbe5902cc4e8d577e8c0f55a8d3af91b')
-        
-        #if image_response.status_code == 200:
-        #    with BytesIO(image_response.content) as image_buffer:
-        #        line_bot_api.set_rich_menu_image('richmenu-bbe5902cc4e8d577e8c0f55a8d3af91b', 'image/jpeg', image_buffer)
-        
+
         tp = json_data["events"][0]["message"]["type"]
         tk = json_data["events"][0]["replyToken"]  # 取得 reply token
+
+        if tp == "text":
+
+            if (
+                json_data["events"][0]["message"]["text"] == "雷達回波圖"
+                or json_data["events"][0]["message"]["text"] == "雷達回波"
+            ):  # 如果是雷達回波圖相關的文字
+                # 傳送雷達回波圖 ( 加上時間戳記 )
+                reply_image(
+                    f"https://cwbopendata.s3.ap-northeast-1.amazonaws.com/MSC/O-A0058-003.png?{time.time_ns()}",
+                    tk,
+                    os.getenv("CHANNEL_ACCESS_TOKEN"),
+                )
 
     except Exception as error:
         print(error)  # 如果發生錯誤，印出收到的內容
@@ -45,3 +48,20 @@ def linebot():
 
 if __name__ == "__main__":
     app.run()
+
+
+def reply_image(msg, rk, token):
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    body = {
+        "replyToken": rk,
+        "messages": [
+            {"type": "image", "originalContentUrl": msg, "previewImageUrl": msg}
+        ],
+    }
+    req = requests.request(
+        "POST",
+        "https://api.line.me/v2/bot/message/reply",
+        headers=headers,
+        data=json.dumps(body).encode("utf-8"),
+    )
+    print(req.text)

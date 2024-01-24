@@ -34,7 +34,7 @@ def linebot():
             ):  # 如果是雷達回波圖相關的文字
                 # 傳送雷達回波圖 ( 加上時間戳記 )
                 reply_image(
-                    f"https://opendata.cwa.gov.tw/dataset/observation/O-A0058-003?{time.time_ns()}",
+                    f"https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0058-005.png?{time.time_ns()}",
                     tk,
                     os.getenv("CHANNEL_ACCESS_TOKEN"),
                 )

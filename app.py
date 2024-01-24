@@ -62,7 +62,7 @@ def linebot():
                 or json_data["events"][0]["message"]["text"] == "地震資訊"
             ):
                 e_url = "https://opendata.cwa.gov.tw/fileapi/v1/opendataapi/E-A0016-001?Authorization=CWA-DAEAB112-B74E-41D8-B951-527F63665E26&format=JSON"
-                e_data = requests.get(url)  # 爬取地震資訊網址
+                e_data = requests.get(e_url)  # 爬取地震資訊網址
                 e_data_json = e_data.json()  # json 格式化訊息內容
                 eq = e_data_json["records"]["earthquake"]  # 取出地震資訊
                 for i in eq:

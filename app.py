@@ -70,7 +70,7 @@ def reply_image(msg, rk, token):
     body = {
         "replyToken": rk,
         "messages": [
-            {"type": "image", "originalContentUrl": msg, "previewImageUrl": msg}
+            {"type": "image", "originalContentUrl": msg + "?" + formatted_time, "previewImageUrl": msg + "?" + formatted_time}
         ],
     }
     req = requests.request(

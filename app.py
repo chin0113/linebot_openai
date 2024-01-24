@@ -6,19 +6,21 @@ from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import *
 
+now = datetime.now()
+
+# 设置时区为台湾（东八区，+08:00）
+timezone = pytz.timezone("Asia/Taipei")
+now_with_timezone = now.replace(tzinfo=timezone)
+
+# 格式化输出
+formatted_time = now_with_timezone.strftime("%Y-%m-%dT%H:%M:%S%z")
+    
 app = Flask(__name__)
 
 
 @app.route("/callback", methods=["POST"])
 def linebot():
-    now = datetime.now()
-
-    # 设置时区为台湾（东八区，+08:00）
-    timezone = pytz.timezone("Asia/Taipei")
-    now_with_timezone = now.replace(tzinfo=timezone)
-
-    # 格式化输出
-    formatted_time = now_with_timezone.strftime("%Y-%m-%dT%H:%M:%S%z")
+    
 
     body = request.get_data(as_text=True)
     json_data = json.loads(body)

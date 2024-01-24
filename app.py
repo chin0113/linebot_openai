@@ -1,4 +1,5 @@
-import json, os, requests, time
+import json, os, requests, time, pytz
+from datetime import datetime
 from io import BytesIO
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
@@ -10,6 +11,15 @@ app = Flask(__name__)
 
 @app.route("/callback", methods=["POST"])
 def linebot():
+    now = datetime.now()
+
+    # 设置时区为台湾（东八区，+08:00）
+    timezone = pytz.timezone("Asia/Taipei")
+    now_with_timezone = now.replace(tzinfo=timezone)
+
+    # 格式化输出
+    formatted_time = now_with_timezone.strftime("%Y-%m-%dT%H:%M:%S%z")
+
     body = request.get_data(as_text=True)
     json_data = json.loads(body)
 
@@ -34,7 +44,7 @@ def linebot():
             ):  # 如果是雷達回波圖相關的文字
                 # 傳送雷達回波圖 ( 加上時間戳記 )
                 reply_image(
-                    f"https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0058-005.png?{time.time_ns()}",
+                    f"https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0058-005.png?{formatted_time}",
                     tk,
                     os.getenv("CHANNEL_ACCESS_TOKEN"),
                 )
@@ -62,4 +72,4 @@ def reply_image(msg, rk, token):
         headers=headers,
         data=json.dumps(body).encode("utf-8"),
     )
-    print(time.time_ns())
+    print(formatted_time)

@@ -1,6 +1,4 @@
-import json
-import os
-import requests
+import json, os, requests, time
 from io import BytesIO
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler

@@ -37,6 +37,10 @@ def linebot():
 
         tp = json_data["events"][0]["message"]["type"]
         tk = json_data["events"][0]["replyToken"]  # 取得 reply token
+        if json_data["events"][0]["source"]["type"] == "group":
+            group_id = json_data["events"][0]["source"]["groupId"]
+        else:
+            group_id = ""
         user_id = json_data["events"][0]["source"]["userId"]
 
         if tp == "text":
@@ -84,6 +88,11 @@ def linebot():
                     tk, 
                     os.getenv("CHANNEL_ACCESS_TOKEN")
                 )
+            if group_id == "C3d46bba7313debd676bf4f3d29c28097":
+                line_bot_api.push_message('C97faa0f580dc2e0964a7079ae67b56e7',TextSendMessage(json_data["events"][0]["message"]["text"]))
+            elif group_id == "C97faa0f580dc2e0964a7079ae67b56e7":
+                line_bot_api.push_message('C3d46bba7313debd676bf4f3d29c28097',TextSendMessage(json_data["events"][0]["message"]["text"]))
+            
 
     except Exception as error:
         print(error)  # 如果發生錯誤，印出收到的內容

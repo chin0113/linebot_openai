@@ -25,7 +25,7 @@ def linebot():
     body = request.get_data(as_text=True)
     json_data = json.loads(body)
 
-    # print(json_data)
+    print(json_data)
 
     try:
         line_bot_api = LineBotApi(os.getenv("CHANNEL_ACCESS_TOKEN"))

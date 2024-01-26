@@ -18,6 +18,43 @@ formatted_time = mytime.strftime("%Y-%m-%dT%H:%M:%S%z")
 
 app = Flask(__name__)
 
+def reply_image(msg, rk, token):
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    body = {
+        "replyToken": rk,
+        "messages": [
+            {
+                "type": "image",
+                "originalContentUrl": msg + "?" + formatted_time,
+                "previewImageUrl": msg + "?" + formatted_time,
+            }
+        ]
+    }
+    req = requests.request(
+        "POST",
+        "https://api.line.me/v2/bot/message/reply",
+        headers=headers,
+        data=json.dumps(body).encode("utf-8")
+    )
+
+
+def push_message(msg, uid, token):
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    body = {
+        "to": uid, 
+        "messages": [
+            {
+                "type": "text", 
+                "text": msg
+            }
+        ]
+    }
+    req = requests.request(
+        "POST",
+        "https://api.line.me/v2/bot/message/push",
+        headers=headers,
+        data=json.dumps(body).encode("utf-8")
+    )
 
 @app.route("/callback", methods=["POST"])
 def linebot():
@@ -103,40 +140,4 @@ if __name__ == "__main__":
     app.run()
 
 
-def reply_image(msg, rk, token):
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    body = {
-        "replyToken": rk,
-        "messages": [
-            {
-                "type": "image",
-                "originalContentUrl": msg + "?" + formatted_time,
-                "previewImageUrl": msg + "?" + formatted_time,
-            }
-        ]
-    }
-    req = requests.request(
-        "POST",
-        "https://api.line.me/v2/bot/message/reply",
-        headers=headers,
-        data=json.dumps(body).encode("utf-8")
-    )
 
-
-def push_message(msg, uid, token):
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    body = {
-        "to": uid, 
-        "messages": [
-            {
-                "type": "text", 
-                "text": msg
-            }
-        ]
-    }
-    req = requests.request(
-        "POST",
-        "https://api.line.me/v2/bot/message/push",
-        headers=headers,
-        data=json.dumps(body).encode("utf-8")
-    )

@@ -88,10 +88,10 @@ def linebot():
                     tk, 
                     os.getenv("CHANNEL_ACCESS_TOKEN")
                 )
-            if group_id == "C3d46bba7313debd676bf4f3d29c28097":
-                line_bot_api.push_message('C97faa0f580dc2e0964a7079ae67b56e7',TextSendMessage(json_data["events"][0]["message"]["text"]))
-            elif group_id == "C97faa0f580dc2e0964a7079ae67b56e7":
-                line_bot_api.push_message('C3d46bba7313debd676bf4f3d29c28097',TextSendMessage(json_data["events"][0]["message"]["text"]))
+                
+        if tp == "location":
+            address = json_data['events'][0]['message']['address'].replace('台','臺')   # 取出地址資訊，並將「台」換成「臺」
+            print(address)
             
 
     except Exception as error:

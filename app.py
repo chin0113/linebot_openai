@@ -150,7 +150,7 @@ def current_weather(address):
 
 @app.route("/callback", methods=["POST"])
 def linebot():
-
+    line_bot_api.reply_message(tk, TextSendMessage("hi"))
     body = request.get_data(as_text=True)
     json_data = json.loads(body)
 
@@ -209,7 +209,6 @@ def linebot():
                 reply_arr=[]
                 reply_arr.append(TextSendMessage(msg[0]))
                 reply_arr.append(ImageSendMessage(original_content_url=msg[1], preview_image_url=msg[1]))
-                reply_arr.append(TextSendMessage("123"))
                 line_bot_api.reply_message(tk, reply_arr)
                 
                 # reply_message(msg[0], tk, os.getenv("CHANNEL_ACCESS_TOKEN"))

@@ -148,6 +148,57 @@ def current_weather(address):
         return msg  # 如果取資料有發生錯誤，直接回傳 msg
 
 
+def forecast(address):
+    area_list = {}
+    json_api = {"宜蘭縣":"F-D0047-001","桃園市":"F-D0047-005","新竹縣":"F-D0047-009","苗栗縣":"F-D0047-013",
+            "彰化縣":"F-D0047-017","南投縣":"F-D0047-021","雲林縣":"F-D0047-025","嘉義縣":"F-D0047-029",
+            "屏東縣":"F-D0047-033","臺東縣":"F-D0047-037","花蓮縣":"F-D0047-041","澎湖縣":"F-D0047-045",
+            "基隆市":"F-D0047-049","新竹市":"F-D0047-053","嘉義市":"F-D0047-057","臺北市":"F-D0047-061",
+            "高雄市":"F-D0047-065","新北市":"F-D0047-069","臺中市":"F-D0047-073","臺南市":"F-D0047-077",
+            "連江縣":"F-D0047-081","金門縣":"F-D0047-085"}
+    msg = '找不到天氣預報資訊。'    # 預設回傳訊息
+    try:
+        code = 'CWA-DAEAB112-B74E-41D8-B951-527F63665E26'
+        url = f'https://opendata.cwa.gov.tw/fileapi/v1/opendataapi/F-C0032-001?Authorization={code}&downloadType=WEB&format=JSON'
+        
+        f_data = requests.get(url)   # 取得主要縣市預報資料
+        f_data_json = f_data.json()  # json 格式化訊息內容
+        location = f_data_json['cwaopendata']['dataset']['location']  # 取得縣市的預報內容
+
+        for i in location:
+            city = i['locationName']    # 縣市名稱
+            wx8 = i['weatherElement'][0]['time'][0]['parameter']['parameterName']    # 天氣現象
+            mint8 = i['weatherElement'][1]['time'][0]['parameter']['parameterName']  # 最低溫
+            maxt8 = i['weatherElement'][2]['time'][0]['parameter']['parameterName']  # 最高溫
+            ci8 = i['weatherElement'][2]['time'][0]['parameter']['parameterName']    # 舒適度
+            pop8 = i['weatherElement'][2]['time'][0]['parameter']['parameterName']   # 降雨機率
+            area_list[city] = f'未來 8 小時{wx8}，最高溫 {maxt8} 度，最低溫 {mint8} 度，降雨機率 {pop8} %'  # 組合成回傳的訊息，存在以縣市名稱為 key 的字典檔裡
+        
+        for i in area_list:
+            if i in address:        # 如果使用者的地址包含縣市名稱
+                msg = area_list[i]  # 將 msg 換成對應的預報資訊
+                # 將進一步的預報網址換成對應的預報網址
+                url = f'https://opendata.cwa.gov.tw/fileapi/v1/opendataapi/{json_api[i]}?Authorization={code}&downloadType=WEB&format=JSON'
+                f_data = requests.get(url)  # 取得主要縣市裡各個區域鄉鎮的氣象預報
+                f_data_json = f_data.json() # json 格式化訊息內容
+                location = f_data_json['cwaopendata']['dataset']['locations']['location']    # 取得預報內容    
+                break
+
+        for i in location:
+            city = i['locationName']   # 取得縣市名稱
+            
+            for j in i['weatherElement']:
+                if j['elementName'] == 'WeatherDescription':
+                    wd = j['time'][0]['elementValue']['value']  # 綜合描述
+    
+            if city in address:           # 如果使用者的地址包含鄉鎮區域名稱
+                msg = f'未來八小時天氣{wd}' # 將 msg 換成對應的預報資訊
+                break
+        
+        return msg  # 回傳 msg
+    except:
+        return msg  # 如果取資料有發生錯誤，直接回傳 msg
+
 @app.route("/callback", methods=["POST"])
 def linebot():
     body = request.get_data(as_text=True)
@@ -165,8 +216,6 @@ def linebot():
 
         tp = json_data["events"][0]["message"]["type"]
         tk = json_data["events"][0]["replyToken"]  # 取得 reply token
-        
-        
         
         if json_data["events"][0]["source"]["type"] == "group":
             group_id = json_data["events"][0]["source"]["groupId"]
@@ -220,11 +269,13 @@ def linebot():
             address = json_data["events"][0]["message"]["address"].replace(
                 "台", "臺"
             )  # 取出地址資訊，並將「台」換成「臺」
+            
             reply_message(
-                f"{address}\n\n{current_weather(address)}",
-                tk,
-                os.getenv("CHANNEL_ACCESS_TOKEN"),
+                f'{address}\n\n{current_weather(address)}\n\n{forecast(address)}', 
+                tk, 
+                os.getenv("CHANNEL_ACCESS_TOKEN")
             )
+            
             print(address)
 
     except Exception as error:

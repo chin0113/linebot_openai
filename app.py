@@ -209,7 +209,7 @@ def linebot():
                 reply_arr=[]
                 reply_arr.append(TextSendMessage(msg[0]))
                 reply_arr.append(ImageSendMessage(msg[1]))
-                line_bot_api.reply_message(tk, reply_arr)
+                line_bot_api.reply_message(tk, TextSendMessage(msg[0]))
                 
                 # reply_message(msg[0], tk, os.getenv("CHANNEL_ACCESS_TOKEN"))
                 # reply_image(msg[1], tk, os.getenv("CHANNEL_ACCESS_TOKEN"))

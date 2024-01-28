@@ -150,7 +150,6 @@ def current_weather(address):
 
 @app.route("/callback", methods=["POST"])
 def linebot():
-    line_bot_api.reply_message(tk, TextSendMessage("hi"))
     body = request.get_data(as_text=True)
     json_data = json.loads(body)
 
@@ -166,6 +165,9 @@ def linebot():
 
         tp = json_data["events"][0]["message"]["type"]
         tk = json_data["events"][0]["replyToken"]  # 取得 reply token
+        
+        line_bot_api.reply_message(tk, TextSendMessage("hi"))
+        
         if json_data["events"][0]["source"]["type"] == "group":
             group_id = json_data["events"][0]["source"]["groupId"]
         else:

@@ -200,7 +200,7 @@ def forecast(address):
         return msg  # 如果取資料有發生錯誤，直接回傳 msg
 
 
-def aqi(address):
+def aqic(address):
     city_list, site_list ={}, {}
     msg = '找不到空氣品質資訊。'
     try:
@@ -214,6 +214,7 @@ def aqi(address):
             
             if city not in city_list:
                 city_list[city]=[]             # 以縣市名稱為 key，準備存入串列資料
+            
             site = i['sitename']               # 取出鄉鎮區域名稱
             aqi = int(i['aqi'])                # 取得 AQI 數值
             status = i['status']               # 取得空氣品質狀態
@@ -318,7 +319,7 @@ def linebot():
             )  # 取出地址資訊，並將「台」換成「臺」
             
             reply_message(
-                f'{address}\n\n{current_weather(address)}\n\n{forecast(address)}\n\n{api(address)}', 
+                f'{address}\n\n{current_weather(address)}\n\n{forecast(address)}\n\n{apic(address)}', 
                 tk, 
                 os.getenv("CHANNEL_ACCESS_TOKEN")
             )

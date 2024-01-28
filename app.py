@@ -21,7 +21,15 @@ app = Flask(__name__)
 
 def reply_message(msg, rk, token):
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    body = {"replyToken": rk, "messages": [{"type": "text", "text": msg}]}
+    body = {
+        "replyToken": rk, 
+        "messages": [
+            {
+                "type": "text", 
+                "text": msg
+            }
+        ]
+    }
     req = requests.request(
         "POST",
         "https://api.line.me/v2/bot/message/reply",
@@ -198,8 +206,13 @@ def linebot():
                     break  # 取出第一筆資料後就 break
                 
                 # push_message(msg[0], user_id, os.getenv("CHANNEL_ACCESS_TOKEN"))
-                reply_message(msg[0], tk, os.getenv("CHANNEL_ACCESS_TOKEN"))
-                reply_image(msg[1], tk, os.getenv("CHANNEL_ACCESS_TOKEN"))
+                reply_arr=[]
+                reply_arr.append(TextSendMessage(msg[0]))
+                reply_arr.append(ImageSendMessage(msg[1]))
+                line_bot_api.reply_message(tk, reply_arr)
+                
+                # reply_message(msg[0], tk, os.getenv("CHANNEL_ACCESS_TOKEN"))
+                # reply_image(msg[1], tk, os.getenv("CHANNEL_ACCESS_TOKEN"))
 
         if tp == "location":
             address = json_data["events"][0]["message"]["address"].replace(

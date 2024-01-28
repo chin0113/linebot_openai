@@ -200,7 +200,7 @@ def forecast(address):
         return msg  # 如果取資料有發生錯誤，直接回傳 msg
 
 
-def aqic(address):
+def aqi(address):
     city_list, site_list ={}, {}
     msg = '找不到空氣品質資訊。'
     try:
@@ -319,7 +319,7 @@ def linebot():
             )  # 取出地址資訊，並將「台」換成「臺」
             
             reply_message(
-                f'{address}\n\n{current_weather(address)}\n\n{forecast(address)}\n\n{apic(address)}', 
+                f'{address}\n\n{current_weather(address)}\n\n{forecast(address)}\n\n{aqi(address)}', 
                 tk, 
                 os.getenv("CHANNEL_ACCESS_TOKEN")
             )

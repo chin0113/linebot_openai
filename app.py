@@ -208,7 +208,7 @@ def linebot():
                 # push_message(msg[0], user_id, os.getenv("CHANNEL_ACCESS_TOKEN"))
                 reply_arr=[]
                 reply_arr.append(TextSendMessage(msg[0]))
-                # reply_arr.append(ImageSendMessage(msg[1]))
+                reply_arr.append(ImageSendMessage(original_content_url=msg[1], preview_image_url=msg[1]))
                 reply_arr.append(TextSendMessage("123"))
                 line_bot_api.reply_message(tk, reply_arr)
                 

@@ -197,7 +197,7 @@ def linebot():
                     msg = [f"{loc}，芮氏規模 {val} 級，深度 {dep} 公里，發生時間 {eq_time}。", img]
                     break  # 取出第一筆資料後就 break
 
-                push_message(msg[0], user_id, os.getenv("CHANNEL_ACCESS_TOKEN"))
+                reply_message(msg[0], user_id, os.getenv("CHANNEL_ACCESS_TOKEN"))
                 reply_image(msg[1], tk, os.getenv("CHANNEL_ACCESS_TOKEN"))
 
         if tp == "location":

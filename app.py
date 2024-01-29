@@ -271,15 +271,22 @@ def linebot():
         signature = request.headers["X-Line-Signature"]
         handler.handle(body, signature)
         
-        image_url = 'https://steam.oxxostudio.tw/download/python/line-bot-weather-demo.jpg'
-        richmenu_id = 'richmenu-a69b8e585f6d72952a989ff08e824d53'
+        # image_url = 'https://steam.oxxostudio.tw/download/python/line-bot-weather-demo.jpg'
+        # richmenu_id = 'richmenu-a69b8e585f6d72952a989ff08e824d53'
         
-        image_response = requests.get(image_url)
+        image_response = requests.get('https://steam.oxxostudio.tw/download/python/line-bot-weather-demo.jpg')
         if image_response.status_code == 200:
             with BytesIO(image_response.content) as image_buffer:
-                line_bot_api.set_rich_menu_image(richmenu_id, 'image/jpeg', image_buffer)
-                rich_menu(richmenu_id, os.getenv("CHANNEL_SECRET"))
-                                
+                line_bot_api.set_rich_menu_image('richmenu-a69b8e585f6d72952a989ff08e824d53', 'image/jpeg', image_buffer)
+                # rich_menu(richmenu_id, os.getenv("CHANNEL_SECRET"))
+        
+        headers = {"Authorization": f"Bearer {os.getenv("CHANNEL_ACCESS_TOKEN")}", "Content-Type":"application/json"}
+        req = requests.request(
+            'POST', 
+            'https://api.line.me/v2/bot/user/all/richmenu/richmenu-a69b8e585f6d72952a989ff08e824d53', 
+            headers=headers
+        )                   
+        
         tp = json_data["events"][0]["message"]["type"]
         tk = json_data["events"][0]["replyToken"]  # 取得 reply token
         

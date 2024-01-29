@@ -76,7 +76,7 @@ def rich_menu(id, token):
         f'https://api.line.me/v2/bot/user/all/richmenu/{id}', 
         headers=headers
     )                  
-    
+    print(req.text)
     
 def current_weather(address):
     city_list, area_list, area_list2 = {}, {}, {}  # 定義好待會要用的變數
@@ -274,14 +274,10 @@ def linebot():
         handler.handle(body, signature)
         
         line_bot_api.delete_rich_menu('richmenu-bbe5902cc4e8d577e8c0f55a8d3af91b')
+        line_bot_api.delete_rich_menu('richmenu-a69b8e585f6d72952a989ff08e824d53')
         
-        headers = {"Authorization": "Bearer 1PlQGmb524SP8EccC6ZKIvX47fzf0u9pRZy0E4oCjx71d5gTBTy2U+JzlcfWMc10r4haBWSJHSv7kIE/cnRCnFM6VNtF3CMmTzVAR7n7xtlyiJs3RuuMXhPq+xOv4f9IJontF4iVL8amDiYMJlUxCAdB04t89/1O/w1cDnyilFU=", "Content-Type":"application/json"}
-        req = requests.request(
-            'POST', 
-            'https://api.line.me/v2/bot/user/all/richmenu/richmenu-a69b8e585f6d72952a989ff08e824d53', 
-            headers=headers
-        )                   
-        print(req.text)
+        richmenu_id = ''
+        #rich_menu(richmenu_id, os.getenv("CHANNEL_ACCESS_TOKEN"))
             
         tp = json_data["events"][0]["message"]["type"]
         tk = json_data["events"][0]["replyToken"]  # 取得 reply token

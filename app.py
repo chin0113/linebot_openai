@@ -69,7 +69,7 @@ def push_message(msg, uid, token):
     )
 
 
-def rich_menu(url, id, token):
+def rich_menu(id, token):
     headers = {"Authorization": f"Bearer {token}", "Content-Type":"application/json"}
     req = requests.request(
         'POST', 
@@ -274,11 +274,11 @@ def linebot():
         image_url = 'https://steam.oxxostudio.tw/download/python/line-bot-weather-demo.jpg'
         richmenu_id = 'richmenu-a69b8e585f6d72952a989ff08e824d53'
         
-        image_response = requests.get(url)
+        image_response = requests.get(image_url)
         if image_response.status_code == 200:
             with BytesIO(image_response.content) as image_buffer:
                 line_bot_api.set_rich_menu_image(richmenu_id, 'image/jpeg', image_buffer)
-                rich_menu(image_url, richmenu_id, os.getenv("CHANNEL_SECRET"))
+                rich_menu(richmenu_id, os.getenv("CHANNEL_SECRET"))
                                 
         tp = json_data["events"][0]["message"]["type"]
         tk = json_data["events"][0]["replyToken"]  # 取得 reply token

@@ -69,6 +69,20 @@ def push_message(msg, uid, token):
     )
 
 
+def rich_menu(url, id, token):
+    image_response = requests.get(url)
+    if image_response.status_code == 200:
+        with BytesIO(image_response.content) as image_buffer:
+            line_bot_api.set_rich_menu_image(id, 'image/jpeg', image_buffer)
+        
+    headers = {"Authorization": f"Bearer {token}", "Content-Type":"application/json"}
+    req = requests.request(
+        'POST', 
+        f'https://api.line.me/v2/bot/user/all/richmenu/{id}', 
+        headers=headers
+    )                  
+    
+    
 def current_weather(address):
     city_list, area_list, area_list2 = {}, {}, {}  # 定義好待會要用的變數
     msg = "找不到氣象資訊。"  # 預設回傳訊息
@@ -263,12 +277,10 @@ def linebot():
         handler.handle(body, signature)
         
         image_url = 'https://steam.oxxostudio.tw/download/python/line-bot-weather-demo.jpg'
-        image_response = requests.get(image_url)
-
-        if image_response.status_code == 200:
-            with BytesIO(image_response.content) as image_buffer:
-                line_bot_api.set_rich_menu_image('richmenu-a69b8e585f6d72952a989ff08e824d53', 'image/jpeg', image_buffer)
+        richmenu_id = 'richmenu-a69b8e585f6d72952a989ff08e824d53'
         
+        rich_menu(image_url, richmenu_id, os.getenv("CHANNEL_SECRET"))
+                                
         tp = json_data["events"][0]["message"]["type"]
         tk = json_data["events"][0]["replyToken"]  # 取得 reply token
         

@@ -273,8 +273,8 @@ def linebot():
         signature = request.headers["X-Line-Signature"]
         handler.handle(body, signature)
         
-        line_bot_api.delete_rich_menu('richmenu-bbe5902cc4e8d577e8c0f55a8d3af91b')
-        line_bot_api.delete_rich_menu('richmenu-a69b8e585f6d72952a989ff08e824d53')
+        #line_bot_api.delete_rich_menu('richmenu-bbe5902cc4e8d577e8c0f55a8d3af91b')
+        #line_bot_api.delete_rich_menu('richmenu-a69b8e585f6d72952a989ff08e824d53')
         
         richmenu_id = 'richmenu-de2ac8d9838700741d8e309480846506'
         rich_menu(richmenu_id, os.getenv("CHANNEL_ACCESS_TOKEN"))

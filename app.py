@@ -275,9 +275,9 @@ def linebot():
         # richmenu_id = 'richmenu-a69b8e585f6d72952a989ff08e824d53'
         
         image_response = requests.get('https://steam.oxxostudio.tw/download/python/line-rich-menu-demo.jpg')
-        #if image_response.status_code == 200:
-            
-        with BytesIO(image_response.content) as image_buffer:
+        if image_response.status_code == 200:
+            image_buffer = BytesIO(image_response.content)
+            #with BytesIO(image_response.content) as image_buffer:
             line_bot_api.set_rich_menu_image('richmenu-4754c2730b2fed025a9c6e91d555f5b5', 'image/jpeg', image_buffer)
             # rich_menu(richmenu_id, os.getenv("CHANNEL_SECRET"))
             headers = {"Authorization": "Bearer 1PlQGmb524SP8EccC6ZKIvX47fzf0u9pRZy0E4oCjx71d5gTBTy2U+JzlcfWMc10r4haBWSJHSv7kIE/cnRCnFM6VNtF3CMmTzVAR7n7xtlyiJs3RuuMXhPq+xOv4f9IJontF4iVL8amDiYMJlUxCAdB04t89/1O/w1cDnyilFU=", "Content-Type":"application/json"}

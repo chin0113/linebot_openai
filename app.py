@@ -16,6 +16,9 @@ mytime = mytz.localize(datetime.now())
 # 格式化输出
 formatted_time = mytime.strftime("%Y-%m-%dT%H:%M:%S%z")
 
+image_url = 'https://steam.oxxostudio.tw/download/python/line-bot-weather-demo.jpg'
+image_response = requests.get(image_url)
+    
 app = Flask(__name__)
 
 
@@ -261,7 +264,11 @@ def linebot():
 
         signature = request.headers["X-Line-Signature"]
         handler.handle(body, signature)
-
+        
+        if image_response.status_code == 200:
+            with BytesIO(image_response.content) as image_buffer:
+                line_bot_api.set_rich_menu_image('richmenu-a69b8e585f6d72952a989ff08e824d53', 'image/jpeg', image_buffer)
+        
         tp = json_data["events"][0]["message"]["type"]
         tk = json_data["events"][0]["replyToken"]  # 取得 reply token
         

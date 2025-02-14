@@ -1,0 +1,8 @@
+# 忽略 Excel 和下載的檔案
+*.xlsx
+downloads/
+行雲流水/
+
+# 忽略 Python 虛擬環境
+venv/
+__pycache__/

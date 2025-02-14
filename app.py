@@ -28,7 +28,7 @@ handler = WebhookHandler(channel_secret=SECRET)
 home = Path.home()
 base_path = home / "Downloads" / "行雲流水"
 
-OUTPUT_PATH = base_path / "output_heroku.xlsx"
+OUTPUT_PATH = base_path / "output.xlsx"
 ID_FILE_PATH = base_path / "id.xlsx"
 DOWNLOAD_PATH = base_path / "作業"
 

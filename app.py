@@ -13,8 +13,8 @@ from linebot import LineBotApi
 app = Flask(__name__)
 
 # LINE Bot API 設定
-LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
-line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+LINE_ACCESS_TOKEN = os.getenv("LINE_ACCESS_TOKEN")
+line_bot_api = LineBotApi(LINE_ACCESS_TOKEN)
 
 # Google Sheets API 和 Google Drive API 的憑證檔案
 SHEET_CREDENTIALS_FILE = "newagent-gfvg-4f6c0497de66.json"

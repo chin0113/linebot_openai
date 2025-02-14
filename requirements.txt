@@ -9,4 +9,3 @@ google-auth-httplib2
 gspread
 APScheduler
 google-api-python-client
-linebot.v3.messaging

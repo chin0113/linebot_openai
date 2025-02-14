@@ -1,5 +1,4 @@
-line-bot-sdk
 flask
-openai < 1.0.0
 gunicorn
-pytz
+line-bot-sdk
+openpyxl

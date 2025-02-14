@@ -1,20 +1,3 @@
-from flask import Flask, request
-from linebot.v3 import WebhookHandler
-from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
-import os
-
-app = Flask(__name__)
-
-# 使用環境變數來存取 LINE API 金鑰
-ACCESS_TOKEN = os.getenv("LINE_ACCESS_TOKEN")
-SECRET = os.getenv("LINE_SECRET")
-
-# 初始化 LINE Messaging API
-config = Configuration(access_token=ACCESS_TOKEN)
-messaging_api = MessagingApi(api_client=ApiClient(configuration=config))
-handler = WebhookHandler(channel_secret=SECRET)
-
 @app.route("/", methods=['GET', 'POST'])
 def linebot():
     if request.method == 'GET':
@@ -25,7 +8,14 @@ def linebot():
 
     try:
         handler.handle(body=body, signature=signature)
-        print("訊息已接收！")
+        json_data = json.loads(body)
+        
+        if 'events' in json_data and len(json_data['events']) > 0:
+            event = json_data['events'][0]
+            print(f"接收到事件: {event}")
+        else:
+            print("沒有事件需要處理")
+
     except InvalidSignatureError:
         print("簽名驗證失敗！")
         return 'Invalid Signature', 400
@@ -34,7 +24,3 @@ def linebot():
         return 'Internal Server Error', 500
 
     return 'OK'
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)

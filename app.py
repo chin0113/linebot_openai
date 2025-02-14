@@ -31,7 +31,8 @@ def linebot():
             with open(output_file_path, "a", encoding="utf-8") as file:
                 file.write(f"使用者 ID: {user_id}, 訊息: {message}\n")
 
-            print(f"已將訊息寫入 {output_file_path}")
+            output_file_path = os.path.abspath("output.txt")
+            print(f"文件已寫入: {output_file_path}")
 
         else:
             print("沒有事件需要處理")

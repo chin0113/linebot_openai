@@ -15,16 +15,23 @@ config = Configuration(access_token=ACCESS_TOKEN)
 messaging_api = MessagingApi(api_client=ApiClient(configuration=config))
 handler = WebhookHandler(channel_secret=SECRET)
 
-@app.route("/", methods=['POST'])
+@app.route("/", methods=['GET', 'POST'])
 def linebot():
+    if request.method == 'GET':
+        return "伺服器正常運作！"
+
     body = request.get_data(as_text=True)
     signature = request.headers.get('X-Line-Signature')
 
     try:
         handler.handle(body=body, signature=signature)
-        print("訊息已接收！")  # 確認訊息有被接收
+        print("訊息已接收！")
     except InvalidSignatureError:
         print("簽名驗證失敗！")
+        return 'Invalid Signature', 400
+    except Exception as e:
+        print(f"發生未預期的錯誤: {e}")
+        return 'Internal Server Error', 500
 
     return 'OK'
 

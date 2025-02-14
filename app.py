@@ -2,6 +2,7 @@ from flask import Flask, request
 import json
 import gspread
 from google.oauth2.service_account import Credentials
+from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 
@@ -18,6 +19,15 @@ gc = gspread.authorize(credentials)
 
 # 開啟試算表（確保服務帳戶已獲得試算表的編輯權限）
 sheet = gc.open(SPREADSHEET_NAME).sheet1
+
+# 定時任務
+def keep_alive():
+    print("保持伺服器活躍...")
+
+# 設定定時任務，每10分鐘執行一次
+scheduler = BackgroundScheduler()
+scheduler.add_job(keep_alive, 'interval', minutes=10)
+scheduler.start()
 
 @app.route("/", methods=["POST"])
 def linebot():

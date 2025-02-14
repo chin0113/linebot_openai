@@ -47,6 +47,7 @@ def get_drive_service():
 def upload_image_to_drive(image_url, file_name):
     """直接從 URL 下載圖片並上傳到 Google Drive"""
     try:
+        # 下載圖片
         response = requests.get(image_url)
         image_data = io.BytesIO(response.content)
 
@@ -56,9 +57,8 @@ def upload_image_to_drive(image_url, file_name):
             'parents': [FOLDER_ID]
         }
 
-        media = MediaIoBaseUpload(image_data, mimetype='image/jpeg')
-
         # 上傳檔案
+        media = MediaIoBaseUpload(image_data, mimetype='image/jpeg')
         uploaded_file = service.files().create(
             body=file_metadata,
             media_body=media,
@@ -91,23 +91,14 @@ def linebot():
 
             # 如果是圖片訊息，處理圖片
             if message_type == "image":
-                image_id = event["message"]["id"]
-                image_url = f"https://api.line.me/v2/bot/message/{image_id}/content"
+                # 指定要上傳的圖片URL
+                image_url = "https://hsinhua.net/composition/%E7%B7%9A%E4%B8%AD%E4%B8%89/%E4%B8%80%E8%B6%9F%E8%B1%90%E5%AF%8C%E4%B9%8B%E6%97%85/orig/1-1%E6%9D%8E%E5%A6%8D%E6%9B%A6.jpg"
                 
                 # 打印圖片的 URL
-                print(f"接收到圖片訊息，圖片網址: {image_url}")
-
-                # 從環境變數獲取 LINE Channel Access Token
-                line_token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
-                if not line_token:
-                    return "LINE Channel Access Token 沒有設置", 500
-
-                headers = {
-                    "Authorization": f"Bearer {line_token}"
-                }
+                print(f"圖片網址: {image_url}")
 
                 # 上傳圖片到 Google Drive
-                uploaded_file_id = upload_image_to_drive(image_url, f"{image_id}.jpg")
+                uploaded_file_id = upload_image_to_drive(image_url, "1-1李妍曦.jpg")
 
                 if uploaded_file_id:
                     print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")

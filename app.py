@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 import json
 import gspread
-import base64  # 確保有導入 base64 模組
+import base64
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
@@ -12,20 +12,17 @@ import io
 
 app = Flask(__name__)
 
+# LINE Messaging API
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
+
 # Google Sheets API 和 Google Drive API 的憑證檔案
 SHEET_CREDENTIALS_FILE = "newagent-gfvg-4f6c0497de66.json"
 SPREADSHEET_NAME = "LineMessages"
 
 # 從環境變數讀取憑證內容
 credentials_base64 = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
-
-# 將 base64 字符串解碼
 credentials_json = base64.b64decode(credentials_base64).decode("utf-8")
-
-# 解析 JSON
 credentials_dict = json.loads(credentials_json)
-
-# 使用憑證來建立 Google API 認證
 drive_credentials = Credentials.from_service_account_info(credentials_dict)
 
 # 設定 Google Sheets API 的授權
@@ -34,48 +31,44 @@ sheet_credentials = Credentials.from_service_account_file(
     scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 )
 gc = gspread.authorize(sheet_credentials)
-
-# 開啟 Google Sheets
 sheet = gc.open(SPREADSHEET_NAME).sheet1
 
 # Google Drive API 的資料夾ID
 FOLDER_ID = '11f2Z7Js8uBYWR-h4UUfbBPDZNKzx9qYO'
-
-# 定時任務: 保持伺服器活躍
-def keep_alive():
-    print("保持伺服器活躍...")
-
-# 設定定時任務，每10分鐘執行一次
-scheduler = BackgroundScheduler()
-scheduler.add_job(keep_alive, 'interval', minutes=10)
-scheduler.start()
 
 def get_drive_service():
     """登入並返回 Google Drive API 服務對象"""
     service = build('drive', 'v3', credentials=drive_credentials)
     return service
 
-def upload_image_to_drive(image_url, file_name):
-    """直接從 URL 下載圖片並上傳到 Google Drive"""
-    try:
-        response = requests.get(image_url)
-        image_data = io.BytesIO(response.content)
+def download_image_from_line(message_id):
+    """從 LINE 下載圖片"""
+    headers = {
+        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
+    }
+    url = f"https://api-data.line.me/v2/bot/message/{message_id}/content"
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return io.BytesIO(response.content)
+    else:
+        print(f"無法下載圖片: {response.status_code}")
+        return None
 
+def upload_image_to_drive(image_data, file_name):
+    """將下載的圖片上傳到 Google Drive"""
+    try:
         service = get_drive_service()
         file_metadata = {
             'name': file_name,
             'parents': [FOLDER_ID]
         }
-
         media = MediaIoBaseUpload(image_data, mimetype='image/jpeg')
         uploaded_file = service.files().create(
             body=file_metadata,
             media_body=media,
             fields='id'
         ).execute()
-
         return uploaded_file['id']
-
     except Exception as e:
         print(f"圖片上傳失敗: {e}")
         return None
@@ -83,11 +76,9 @@ def upload_image_to_drive(image_url, file_name):
 @app.route("/", methods=["POST"])
 def linebot():
     body = request.get_data(as_text=True)
-    signature = request.headers.get("X-Line-Signature")
 
     try:
         json_data = json.loads(body)
-        
         if "events" in json_data and len(json_data["events"]) > 0:
             event = json_data["events"][0]
             user_id = event["source"]["userId"]
@@ -97,14 +88,16 @@ def linebot():
             sheet.append_row([user_id, message_text])
 
             if message_type == "image":
-                image_url = "https://hsinhua.net/composition/%E7%B7%9A%E4%B8%AD%E4%B8%89/%E4%B8%80%E8%B6%9F%E8%B1%90%E5%AF%8C%E4%B9%8B%E6%97%85/orig/1-1%E6%9D%8E%E5%A6%8D%E6%9B%A6.jpg"
-                print(f"圖片網址: {image_url}")
-                uploaded_file_id = upload_image_to_drive(image_url, "1-1李妍曦.jpg")
-
-                if uploaded_file_id:
-                    print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
+                message_id = event["message"]["id"]
+                image_data = download_image_from_line(message_id)
+                if image_data:
+                    uploaded_file_id = upload_image_to_drive(image_data, f"{message_id}.jpg")
+                    if uploaded_file_id:
+                        print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
+                    else:
+                        print("圖片上傳失敗")
                 else:
-                    print("圖片上傳失敗")
+                    print("無法下載圖片")
 
             print(f"接收到事件: {event}")
             return "OK"

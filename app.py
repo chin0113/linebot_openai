@@ -94,6 +94,9 @@ def linebot():
                 image_id = event["message"]["id"]
                 image_url = f"https://api.line.me/v2/bot/message/{image_id}/content"
                 
+                # 打印圖片的 URL
+                print(f"接收到圖片訊息，圖片網址: {image_url}")
+
                 # 從環境變數獲取 LINE Channel Access Token
                 line_token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
                 if not line_token:

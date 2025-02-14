@@ -13,7 +13,7 @@ app = Flask(__name__)
 
 # Google Sheets API 和 Google Drive API 的憑證檔案
 SHEET_CREDENTIALS_FILE = "newagent-gfvg-4f6c0497de66.json"
-DRIVE_CREDENTIALS_FILE = "gdrive.json"
+DRIVE_CREDENTIALS_FILE = "newagent-gfvg-3ab5f6b7023a.json"
 SPREADSHEET_NAME = "LineMessages"  # 試算表名稱（請確保你已創建該試算表）
 
 # 設定 Google Sheets API 的授權

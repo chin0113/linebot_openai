@@ -13,8 +13,22 @@ app = Flask(__name__)
 
 # Google Sheets API 和 Google Drive API 的憑證檔案
 SHEET_CREDENTIALS_FILE = "newagent-gfvg-4f6c0497de66.json"
-DRIVE_CREDENTIALS_FILE = "newagent-gfvg-3ab5f6b7023a.json"
+#DRIVE_CREDENTIALS_FILE = "newagent-gfvg-3ab5f6b7023a.json"
 SPREADSHEET_NAME = "LineMessages"  # 試算表名稱（請確保你已創建該試算表）
+
+# 從環境變數讀取憑證內容
+credentials_base64 = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
+
+# 將 base64 字符串解碼
+credentials_json = base64.b64decode(credentials_base64).decode("utf-8")
+
+# 解析 JSON
+credentials_dict = json.loads(credentials_json)
+
+# 使用憑證來建立 Google API 認證
+DRIVE_CREDENTIALS_FILE = Credentials.from_service_account_info(credentials_dict)
+
+# 現在您可以繼續使用該憑證來連接 Google Drive 或 Google Sheets 等服務
 
 # 設定 Google Sheets API 的授權
 sheet_credentials = Credentials.from_service_account_file(

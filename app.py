@@ -11,6 +11,7 @@ import datetime
 import pytz
 from linebot import LineBotApi
 from linebot.models import TextSendMessage, ImageSendMessage
+import urllib.parse
 
 app = Flask(__name__)
 

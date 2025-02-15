@@ -89,29 +89,55 @@ def linebot():
 
     try:
         json_data = json.loads(body)
-        
+
         if "events" in json_data and len(json_data["events"]) > 0:
             event = json_data["events"][0]
             user_id = event["source"]["userId"]
             message_type = event["message"]["type"]
-            message_text = event["message"].get("text", "")
             message_id = event["message"]["id"]
 
-            # 將 user_id 和訊息寫入 Google 試算表
-            sheet.append_row([user_id, message_text])
+            # 處理文字訊息
+            message_text = event["message"].get("text", "")
 
-            if message_type == "image":
+            if message_type == "text":
+                sheet.append_row([user_id, message_text])
+
+            # 處理圖片訊息
+            elif message_type == "image":
+                sheet.append_row([user_id, f"Image ID: {message_id}"])
+
                 # 使用 LineBotApi 下載圖片內容
                 message_content = line_bot_api.get_message_content(message_id)
                 image_data = io.BytesIO(message_content.content)
 
                 # 將圖片上傳到 Google Drive
                 uploaded_file_id = upload_image_to_drive(image_data, f"{message_id}.jpg")
-
                 if uploaded_file_id:
                     print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
                 else:
                     print("圖片上傳失敗")
+
+            # 處理貼圖訊息
+            elif message_type == "sticker":
+                sticker_id = event["message"].get("stickerId", "")
+                sheet.append_row([user_id, f"Sticker ID: {sticker_id}"])
+                print(f"接收到貼圖 ID: {sticker_id}")
+
+            # 處理檔案訊息
+            elif message_type == "file":
+                file_name = event["message"].get("fileName", "")
+                sheet.append_row([user_id, f"File ID: {message_id} (File Name: {file_name})"])
+
+                # 使用 LineBotApi 下載檔案內容
+                message_content = line_bot_api.get_message_content(message_id)
+                file_data = io.BytesIO(message_content.content)
+
+                # 上傳檔案到 Google Drive
+                uploaded_file_id = upload_image_to_drive(file_data, file_name)
+                if uploaded_file_id:
+                    print(f"檔案已上傳到 Google Drive: {uploaded_file_id}")
+                else:
+                    print("檔案上傳失敗")
 
             print(f"接收到事件: {event}")
             return "OK"

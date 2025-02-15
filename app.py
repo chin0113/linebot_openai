@@ -10,6 +10,7 @@ import io
 import datetime
 import pytz
 from linebot import LineBotApi
+from linebot.models import TextSendMessage, ImageSendMessage
 
 app = Flask(__name__)
 
@@ -88,6 +89,29 @@ def upload_image_to_drive(image_data, file_name):
 def keep_alive():
     return "OK", 200
 
+@app.route("/send", methods=["GET"])
+def send_message():
+    """發送文字與圖片訊息到指定的 LINE user ID"""
+    user_id = "U2574668b48e37ef5423509b4e2355321"
+
+    # 文字訊息
+    text_message = TextSendMessage(text="hello")
+
+    # 圖片訊息
+    image_url = "https://hsinhua.net/composition/%E7%B7%9A%E4%B8%AD%E4%B8%89/%E4%B8%80%E8%B6%9F%E8%B1%90%E5%AF%8C%E4%B9%8B%E6%97%85/orig/1-1%E6%9D%8E%E5%A6%8D%E6%9B%A6.jpg"
+    image_message = ImageSendMessage(
+        original_content_url=image_url,
+        preview_image_url=image_url
+    )
+
+    # 發送訊息
+    try:
+        line_bot_api.push_message(user_id, [text_message, image_message])
+        return "Message sent successfully", 200
+    except Exception as e:
+        print(f"發送訊息失敗: {e}")
+        return "Failed to send message", 500
+        
 @app.route("/", methods=["POST"])
 def linebot():
     body = request.get_data(as_text=True)

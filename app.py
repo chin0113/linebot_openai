@@ -15,7 +15,7 @@ import urllib.parse
 
 # Line 群發注意事項：
 
-# 第 118、119 行左右
+# 第 127、128 行左右
 # 注意！要先定義班級 std_class 和作文主題 title
 # 注意！要先定義班級 std_class 和作文主題 title
 # 注意！要先定義班級 std_class 和作文主題 title

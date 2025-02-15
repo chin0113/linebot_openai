@@ -22,6 +22,7 @@ line_bot_api = LineBotApi(LINE_ACCESS_TOKEN)
 SHEET_CREDENTIALS_FILE = "newagent-gfvg-4f6c0497de66.json"
 SPREADSHEET_NAME = "LineMessages"
 LINE_ID_SPREADSHEET_ID = "1uuIEQdD_maLJFG3Qj-gIPWw0w5Ph0leRyrOed_LNmOM"
+MAIL_SPREADSHEET_ID = "13E14q3yzwgnc__vD2hZKYduIwHxGDQabU_VyrtSR8i4"
 
 # 從環境變數讀取憑證內容
 credentials_base64 = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
@@ -45,6 +46,7 @@ gc = gspread.authorize(sheet_credentials)
 # 開啟 Google Sheets
 sheet = gc.open(SPREADSHEET_NAME).sheet1
 line_id_sheet = gc.open_by_key(LINE_ID_SPREADSHEET_ID).sheet1
+mail_sheet = gc.open_by_key(MAIL_SPREADSHEET_ID).sheet1
 
 # Google Drive API 的資料夾ID
 FOLDER_ID = '11f2Z7Js8uBYWR-h4UUfbBPDZNKzx9qYO'
@@ -90,27 +92,61 @@ def keep_alive():
     return "OK", 200
 
 @app.route("/send", methods=["GET"])
-def send_message():
-    """發送文字與圖片訊息到指定的 LINE user ID"""
-    user_id = "U2574668b48e37ef5423509b4e2355321"
-
-    # 文字訊息
-    text_message = TextSendMessage(text="hello")
-
-    # 圖片訊息
-    image_url = "https://hsinhua.net/composition/%E7%B7%9A%E4%B8%AD%E4%B8%89/%E4%B8%80%E8%B6%9F%E8%B1%90%E5%AF%8C%E4%B9%8B%E6%97%85/orig/1-1%E6%9D%8E%E5%A6%8D%E6%9B%A6.jpg"
-    image_message = ImageSendMessage(
-        original_content_url=image_url,
-        preview_image_url=image_url
-    )
-
-    # 發送訊息
+def send_messages():
     try:
-        line_bot_api.push_message(user_id, [text_message, image_message])
-        return "Message sent successfully", 200
+        # 固定的班級與作文標題
+        std_class = "線中六"
+        title = "一趟豐富之旅"
+
+        # 文字訊息
+        text_message = TextSendMessage(text="【作文評語】\n親愛的家長，您好！附檔為芷瑢老師批閱後的作文評語（也有同步mail回信給孩子），還請孩子詳細看過並了解問題點，老師上課會進行總檢討，也同時讓家長掌握孩子的學習成果，謝謝您！")
+
+        # 讀取 Google Sheets 資料
+        records = mail_sheet.get_all_records()
+
+        for row in records:
+            send_image = str(row.get('hw', '')).strip().lower() == 'y'
+            send_text = str(row.get('txt', '')).strip().lower() == 'y'
+
+            id_field = str(row.get('id', '')).strip()
+            if ',' in id_field:
+                user_ids = [uid.strip() for uid in id_field.split(',')]
+            else:
+                user_ids = [id_field] if id_field else []
+
+            name = str(row.get('name', '')).strip()
+
+            if user_ids and name:
+                encoded_name = urllib.parse.quote(name)
+                encoded_class = urllib.parse.quote(std_class)
+                encoded_title = urllib.parse.quote(title)
+
+                image_url = f"https://hsinhua.net/composition/{encoded_class}/{encoded_title}/orig/{encoded_name}.jpg"
+                image_url_pre = f"https://hsinhua.net/composition/{encoded_class}/{encoded_title}/pre/{encoded_name}.jpg"
+                image_message = ImageSendMessage(
+                    original_content_url=image_url,
+                    preview_image_url=image_url_pre
+                )
+
+                for user_id in user_ids:
+                    user_id = user_id.strip()
+                    if user_id:
+                        messages = []
+                        if send_text:
+                            messages.append(text_message)
+                        if send_image:
+                            messages.append(image_message)
+
+                        if messages:
+                            try:
+                                line_bot_api.push_message(user_id, messages)
+                            except Exception as e:
+                                print(f"發送訊息給 {user_id} 失敗: {e}")
+
+        return "Messages sent successfully!", 200
     except Exception as e:
-        print(f"發送訊息失敗: {e}")
-        return "Failed to send message", 500
+        print(f"發生錯誤: {e}")
+        return "Error", 500
         
 @app.route("/", methods=["POST"])
 def linebot():

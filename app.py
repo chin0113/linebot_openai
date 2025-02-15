@@ -44,18 +44,6 @@ sheet = gc.open(SPREADSHEET_NAME).sheet1
 # Google Drive API 的資料夾ID
 FOLDER_ID = '11f2Z7Js8uBYWR-h4UUfbBPDZNKzx9qYO'
 
-import threading
-import time
-
-def keep_alive_thread():
-    while True:
-        print("保持伺服器活躍...")
-        time.sleep(300)  # 每 5 分鐘打印一次
-
-thread = threading.Thread(target=keep_alive_thread)
-thread.daemon = True  # 設為 Daemon 執行緒，隨主程序一起結束
-thread.start()
-
 def get_drive_service():
     """登入並返回 Google Drive API 服務對象"""
     service = build('drive', 'v3', credentials=drive_credentials)
@@ -83,6 +71,10 @@ def upload_image_to_drive(image_data, file_name):
     except Exception as e:
         print(f"圖片上傳失敗: {e}")
         return None
+        
+@app.route("/", methods=["GET"])
+def keep_alive():
+    return "OK", 200
 
 @app.route("/", methods=["POST"])
 def linebot():

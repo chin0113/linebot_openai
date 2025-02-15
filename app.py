@@ -108,6 +108,14 @@ def upload_image_to_drive(image_data, file_name):
         print(f"圖片上傳失敗: {e}")
         return None
 
+def is_new_user(user_id):
+    """檢查 user_id 是否存在於 LINE_ID_SPREADSHEET 的 id 欄位"""
+    records = line_id_sheet.get_all_records()
+    for record in records:
+        if record['id'] == user_id:
+            return False  # 找到 userId，表示已存在
+    return True  # 沒找到，表示是新使用者
+    
 @app.route("/", methods=["GET"])
 def keep_alive():
     return "OK", 200
@@ -190,21 +198,29 @@ def linebot():
                 taiwan_tz = pytz.timezone("Asia/Taipei")
                 taiwan_time = datetime.datetime.now(taiwan_tz).strftime("%Y-%m-%d %H:%M:%S")
 
+                # 檢查是否為新使用者
+                new_user_flag = "new" if is_new_user(user_id) else ""
+                
                 # 處理文字訊息
                 if message_type == "text":
                     message_text = event["message"].get("text", "")
                     print(f"收到文字訊息: {message_text}")  # Debugging
 
                     try:
-                        sheet.append_row([taiwan_time, user_id, message_text])
-                        print("成功寫入 Google Sheet")
+                        sheet.append_row([taiwan_time, user_id, message_text, new_user_flag])
+                        print("文字訊息成功寫入 Google Sheet")
                     except Exception as sheet_error:
                         print(f"寫入 Google Sheet 失敗: {sheet_error}")
 
                 # 處理圖片訊息
                 elif message_type == "image":
                     print(f"收到圖片訊息: {message_id}")  # Debugging
-                    sheet.append_row([taiwan_time, user_id, f"Image ID: {message_id}"])
+
+                    try:
+                        sheet.append_row([taiwan_time, user_id, f"image id: {message_id}", new_user_flag])
+                        print("圖片訊息成功寫入 Google Sheet")
+                    except Exception as sheet_error:
+                        print(f"寫入 Google Sheet 失敗: {sheet_error}")
 
                     # 獲取 class 和 std
                     class_name, std_name = get_class_std_from_user_id(user_id)
@@ -227,8 +243,8 @@ def linebot():
                     print(f"收到貼圖訊息: Sticker ID {sticker_id}")  # Debugging
 
                     try:
-                        sheet.append_row([taiwan_time, user_id, f"sticker id: {sticker_id}"])
-                        print("成功寫入 Google Sheet")
+                        sheet.append_row([taiwan_time, user_id, f"sticker id: {sticker_id}", new_user_flag])
+                        print("貼圖訊息成功寫入 Google Sheet")
                     except Exception as sheet_error:
                         print(f"寫入 Google Sheet 失敗: {sheet_error}")
 

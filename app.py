@@ -1,12 +1,14 @@
 from flask import Flask, request, jsonify
 import json
 import gspread
-import base64  # 確保有導入 base64 模組
+import base64
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import os
 import io
+import datetime
+import pytz
 from linebot import LineBotApi
 
 app = Flask(__name__)
@@ -81,7 +83,7 @@ def upload_image_to_drive(image_data, file_name):
     except Exception as e:
         print(f"圖片上傳失敗: {e}")
         return None
-        
+
 @app.route("/", methods=["GET"])
 def keep_alive():
     return "OK", 200
@@ -100,15 +102,20 @@ def linebot():
             message_type = event["message"]["type"]
             message_id = event["message"]["id"]
 
+            # 取得事件的 timestamp 並轉換為台灣時間
+            timestamp = event["timestamp"]
+            taiwan_tz = pytz.timezone("Asia/Taipei")
+            taiwan_time = datetime.datetime.fromtimestamp(timestamp / 1000, tz=pytz.utc).astimezone(taiwan_tz).strftime("%Y-%m-%d %H:%M:%S")
+
             # 處理文字訊息
             message_text = event["message"].get("text", "")
 
             if message_type == "text":
-                sheet.append_row([user_id, message_text])
+                sheet.append_row([taiwan_time, user_id, message_text])
 
             # 處理圖片訊息
             elif message_type == "image":
-                sheet.append_row([user_id, f"Image ID: {message_id}"])
+                sheet.append_row([taiwan_time, user_id, f"Image ID: {message_id}"])
 
                 # 獲取 class 和 std
                 class_name, std_name = get_class_std_from_user_id(user_id)
@@ -128,13 +135,13 @@ def linebot():
             # 處理貼圖訊息
             elif message_type == "sticker":
                 sticker_id = event["message"].get("stickerId", "")
-                sheet.append_row([user_id, f"Sticker ID: {sticker_id}"])
+                sheet.append_row([taiwan_time, user_id, f"Sticker ID: {sticker_id}"])
                 print(f"接收到貼圖 ID: {sticker_id}")
 
             # 處理檔案訊息
             elif message_type == "file":
                 file_name = event["message"].get("fileName", "")
-                sheet.append_row([user_id, f"File ID: {message_id} (File Name: {file_name})"])
+                sheet.append_row([taiwan_time, user_id, f"File ID: {message_id} (File Name: {file_name})"])
 
                 # 使用 LineBotApi 下載檔案內容
                 message_content = line_bot_api.get_message_content(message_id)

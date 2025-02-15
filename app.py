@@ -10,7 +10,7 @@ import io
 import datetime
 import pytz
 from linebot import LineBotApi
-from linebot.models import TextSendMessage
+from linebot import LineBotApi, TextSendMessage, ImageSendMessage
 
 app = Flask(__name__)
 
@@ -110,15 +110,15 @@ def linebot():
 
 @app.route("/send", methods=["GET"])
 def send_message():
-    try:
-        user_id = "U2574668b48e37ef5423509b4e2355321"
-        message = TextSendMessage(text="hello")
-        line_bot_api.push_message(user_id, message)
-        print(f"已發送訊息給 {user_id}")
-        return "Message sent!", 200
-    except Exception as e:
-        print(f"發送訊息失敗: {e}")
-        return "Failed to send message", 500
+    user_id = "U2574668b48e37ef5423509b4e2355321"
+    text_message = TextSendMessage(text="hello")
+    image_message = ImageSendMessage(
+        original_content_url="https://hsinhua.net/composition/%E7%B7%9A%E4%B8%AD%E4%B8%89/%E4%B8%80%E8%B6%9F%E8%B1%90%E5%AF%8C%E4%B9%8B%E6%97%85/orig/1-1%E6%9D%8E%E5%A6%8D%E6%9B%A6.jpg",
+        preview_image_url="https://hsinhua.net/composition/%E7%B7%9A%E4%B8%AD%E4%B8%89/%E4%B8%80%E8%B6%9F%E8%B1%90%E5%AF%8C%E4%B9%8B%E6%97%85/orig/1-1%E6%9D%8E%E5%A6%8D%E6%9B%A6.jpg"
+    )
+    
+    line_bot_api.push_message(user_id, [text_message, image_message])
+    return "Message sent", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)

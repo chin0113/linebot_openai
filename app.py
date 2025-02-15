@@ -9,7 +9,6 @@ import os
 import io
 import datetime
 import pytz
-from linebot import LineBotApi
 from linebot import LineBotApi, TextSendMessage, ImageSendMessage
 
 app = Flask(__name__)

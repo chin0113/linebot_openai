@@ -221,6 +221,17 @@ def linebot():
                     else:
                         print("圖片上傳失敗")
 
+                # 處理貼圖訊息
+                elif message_type == "sticker":
+                    sticker_id = event["message"].get("stickerId", "")
+                    print(f"收到貼圖訊息: Sticker ID {sticker_id}")  # Debugging
+
+                    try:
+                        sheet.append_row([taiwan_time, user_id, f"sticker id: {sticker_id}"])
+                        print("成功寫入 Google Sheet")
+                    except Exception as sheet_error:
+                        print(f"寫入 Google Sheet 失敗: {sheet_error}")
+
             return "OK"
         else:
             print("沒有事件需要處理")

@@ -95,12 +95,15 @@ def linebot():
 
     try:
         json_data = json.loads(body)
+        print(f"收到的 JSON: {json.dumps(json_data, indent=2)}")  # Debugging
 
         if "events" in json_data:
             for event in json_data["events"]:  # 遍歷所有事件
+                print(f"處理事件: {event}")  # Debugging
+
                 user_id = event["source"]["userId"]
-                message_type = event["message"]["type"]
-                message_id = event["message"]["id"]
+                message_type = event["message"].get("type", "")
+                message_id = event["message"].get("id", "")
 
                 # 獲取台灣時間
                 taiwan_tz = pytz.timezone("Asia/Taipei")
@@ -109,10 +112,17 @@ def linebot():
                 # 處理文字訊息
                 if message_type == "text":
                     message_text = event["message"].get("text", "")
-                    sheet.append_row([taiwan_time, user_id, message_text])
+                    print(f"收到文字訊息: {message_text}")  # Debugging
+
+                    try:
+                        sheet.append_row([taiwan_time, user_id, message_text])
+                        print("成功寫入 Google Sheet")
+                    except Exception as sheet_error:
+                        print(f"寫入 Google Sheet 失敗: {sheet_error}")
 
                 # 處理圖片訊息
                 elif message_type == "image":
+                    print(f"收到圖片訊息: {message_id}")  # Debugging
                     sheet.append_row([taiwan_time, user_id, f"Image ID: {message_id}"])
 
                     # 獲取 class 和 std
@@ -129,8 +139,6 @@ def linebot():
                         print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
                     else:
                         print("圖片上傳失敗")
-
-                print(f"接收到事件: {event}")
 
             return "OK"
         else:

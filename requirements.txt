@@ -1,4 +1,4 @@
-flask==3.1.0
+flask
 gunicorn
 line-bot-sdk==3.16.0
 openpyxl

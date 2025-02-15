@@ -5,7 +5,6 @@ import base64  # 確保有導入 base64 模組
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-from apscheduler.schedulers.background import BackgroundScheduler
 import os
 import io
 from linebot import LineBotApi
@@ -45,14 +44,17 @@ sheet = gc.open(SPREADSHEET_NAME).sheet1
 # Google Drive API 的資料夾ID
 FOLDER_ID = '11f2Z7Js8uBYWR-h4UUfbBPDZNKzx9qYO'
 
-# 定時任務: 保持伺服器活躍
-def keep_alive():
-    print("保持伺服器活躍...")
+import threading
+import time
 
-# 設定定時任務，每10分鐘執行一次
-scheduler = BackgroundScheduler()
-scheduler.add_job(keep_alive, 'interval', minutes=1)
-scheduler.start()
+def keep_alive_thread():
+    while True:
+        print("保持伺服器活躍...")
+        time.sleep(300)  # 每 5 分鐘打印一次
+
+thread = threading.Thread(target=keep_alive_thread)
+thread.daemon = True  # 設為 Daemon 執行緒，隨主程序一起結束
+thread.start()
 
 def get_drive_service():
     """登入並返回 Google Drive API 服務對象"""

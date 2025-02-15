@@ -11,4 +11,3 @@ APScheduler
 google-api-python-client
 pytz
 datetime
-linebot

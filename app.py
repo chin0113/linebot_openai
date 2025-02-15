@@ -51,7 +51,7 @@ def keep_alive():
 
 # 設定定時任務，每10分鐘執行一次
 scheduler = BackgroundScheduler()
-scheduler.add_job(keep_alive, 'interval', minutes=10)
+scheduler.add_job(keep_alive, 'interval', minutes=1)
 scheduler.start()
 
 def get_drive_service():

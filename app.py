@@ -13,6 +13,23 @@ from linebot import LineBotApi
 from linebot.models import TextSendMessage, ImageSendMessage
 import urllib.parse
 
+# Line 群發注意事項：
+
+# 第 118、119 行左右
+# 注意！要先定義班級 std_class 和作文主題 title
+# 注意！要先定義班級 std_class 和作文主題 title
+# 注意！要先定義班級 std_class 和作文主題 title
+
+# 注意！圖檔要上傳到網站
+# 注意！圖檔要上傳到網站
+# 注意！圖檔要上傳到網站
+
+# 第 43、44 行左右
+# MAIL_SPREADSHEET_ID 需先用測試
+# MAIL_SPREADSHEET_ID 需先用測試
+# MAIL_SPREADSHEET_ID 需先用測試
+
+
 app = Flask(__name__)
 
 # LINE Bot API 設定
@@ -23,6 +40,9 @@ line_bot_api = LineBotApi(LINE_ACCESS_TOKEN)
 SHEET_CREDENTIALS_FILE = "newagent-gfvg-4f6c0497de66.json"
 SPREADSHEET_NAME = "LineMessages"
 LINE_ID_SPREADSHEET_ID = "1uuIEQdD_maLJFG3Qj-gIPWw0w5Ph0leRyrOed_LNmOM"
+#正式
+#MAIL_SPREADSHEET_ID = "1w5brdzpIELPZaKa8C_QGcRK1byZLXXQwBz1FM0rsqVA"
+#測試
 MAIL_SPREADSHEET_ID = "13E14q3yzwgnc__vD2hZKYduIwHxGDQabU_VyrtSR8i4"
 
 # 從環境變數讀取憑證內容
@@ -96,7 +116,7 @@ def keep_alive():
 def send_messages():
     try:
         # 固定的班級與作文標題
-        std_class = "線中六"
+        std_class = "線中三"
         title = "一趟豐富之旅"
 
         # 文字訊息

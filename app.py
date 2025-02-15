@@ -7,8 +7,6 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import os
 import io
-import datetime
-import pytz
 from linebot import LineBotApi
 
 app = Flask(__name__)
@@ -20,7 +18,7 @@ line_bot_api = LineBotApi(LINE_ACCESS_TOKEN)
 # Google Sheets API 和 Google Drive API 的憑證檔案
 SHEET_CREDENTIALS_FILE = "newagent-gfvg-4f6c0497de66.json"
 SPREADSHEET_NAME = "LineMessages"
-LINE_ID_SPREADSHEET_ID = "1uuIEQdD_maLJFG3Qj-gIPWw5Ph0leRyrOed_LNmOM"
+LINE_ID_SPREADSHEET_ID = "1uuIEQdD_maLJFG3Qj-gIPWw0w5Ph0leRyrOed_LNmOM"
 
 # 從環境變數讀取憑證內容
 credentials_base64 = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
@@ -102,19 +100,15 @@ def linebot():
             message_type = event["message"]["type"]
             message_id = event["message"]["id"]
 
-            # 獲取台灣時間
-            taiwan_tz = pytz.timezone("Asia/Taipei")
-            taiwan_time = datetime.datetime.now(taiwan_tz).strftime("%Y-%m-%d %H:%M:%S")
-
             # 處理文字訊息
             message_text = event["message"].get("text", "")
 
             if message_type == "text":
-                sheet.append_row([taiwan_time, user_id, message_text])
+                sheet.append_row([user_id, message_text])
 
             # 處理圖片訊息
             elif message_type == "image":
-                sheet.append_row([taiwan_time, user_id, f"Image ID: {message_id}"])
+                sheet.append_row([user_id, f"Image ID: {message_id}"])
 
                 # 獲取 class 和 std
                 class_name, std_name = get_class_std_from_user_id(user_id)
@@ -130,6 +124,28 @@ def linebot():
                     print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
                 else:
                     print("圖片上傳失敗")
+
+            # 處理貼圖訊息
+            elif message_type == "sticker":
+                sticker_id = event["message"].get("stickerId", "")
+                sheet.append_row([user_id, f"Sticker ID: {sticker_id}"])
+                print(f"接收到貼圖 ID: {sticker_id}")
+
+            # 處理檔案訊息
+            elif message_type == "file":
+                file_name = event["message"].get("fileName", "")
+                sheet.append_row([user_id, f"File ID: {message_id} (File Name: {file_name})"])
+
+                # 使用 LineBotApi 下載檔案內容
+                message_content = line_bot_api.get_message_content(message_id)
+                file_data = io.BytesIO(message_content.content)
+
+                # 上傳檔案到 Google Drive
+                uploaded_file_id = upload_image_to_drive(file_data, file_name)
+                if uploaded_file_id:
+                    print(f"檔案已上傳到 Google Drive: {uploaded_file_id}")
+                else:
+                    print("檔案上傳失敗")
 
             print(f"接收到事件: {event}")
             return "OK"

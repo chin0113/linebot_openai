@@ -96,65 +96,42 @@ def linebot():
     try:
         json_data = json.loads(body)
 
-        if "events" in json_data and len(json_data["events"]) > 0:
-            event = json_data["events"][0]
-            user_id = event["source"]["userId"]
-            message_type = event["message"]["type"]
-            message_id = event["message"]["id"]
+        if "events" in json_data:
+            for event in json_data["events"]:  # 遍歷所有事件
+                user_id = event["source"]["userId"]
+                message_type = event["message"]["type"]
+                message_id = event["message"]["id"]
 
-            # 取得事件的 timestamp 並轉換為台灣時間
-            timestamp = event["timestamp"]
-            taiwan_tz = pytz.timezone("Asia/Taipei")
-            taiwan_time = datetime.datetime.fromtimestamp(timestamp / 1000, tz=pytz.utc).astimezone(taiwan_tz).strftime("%Y-%m-%d %H:%M:%S")
+                # 獲取台灣時間
+                taiwan_tz = pytz.timezone("Asia/Taipei")
+                taiwan_time = datetime.datetime.now(taiwan_tz).strftime("%Y-%m-%d %H:%M:%S")
 
-            # 處理文字訊息
-            message_text = event["message"].get("text", "")
+                # 處理文字訊息
+                if message_type == "text":
+                    message_text = event["message"].get("text", "")
+                    sheet.append_row([taiwan_time, user_id, message_text])
 
-            if message_type == "text":
-                sheet.append_row([taiwan_time, user_id, message_text])
+                # 處理圖片訊息
+                elif message_type == "image":
+                    sheet.append_row([taiwan_time, user_id, f"Image ID: {message_id}"])
 
-            # 處理圖片訊息
-            elif message_type == "image":
-                sheet.append_row([taiwan_time, user_id, f"Image ID: {message_id}"])
+                    # 獲取 class 和 std
+                    class_name, std_name = get_class_std_from_user_id(user_id)
+                    file_name = f"{class_name}_{std_name}_{message_id}.jpg" if class_name and std_name else f"{message_id}.jpg"
 
-                # 獲取 class 和 std
-                class_name, std_name = get_class_std_from_user_id(user_id)
-                file_name = f"{class_name}_{std_name}_{message_id}.jpg" if class_name and std_name else f"{message_id}.jpg"
+                    # 下載圖片內容
+                    message_content = line_bot_api.get_message_content(message_id)
+                    image_data = io.BytesIO(message_content.content)
 
-                # 使用 LineBotApi 下載圖片內容
-                message_content = line_bot_api.get_message_content(message_id)
-                image_data = io.BytesIO(message_content.content)
+                    # 上傳圖片到 Google Drive
+                    uploaded_file_id = upload_image_to_drive(image_data, file_name)
+                    if uploaded_file_id:
+                        print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
+                    else:
+                        print("圖片上傳失敗")
 
-                # 將圖片上傳到 Google Drive
-                uploaded_file_id = upload_image_to_drive(image_data, file_name)
-                if uploaded_file_id:
-                    print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
-                else:
-                    print("圖片上傳失敗")
+                print(f"接收到事件: {event}")
 
-            # 處理貼圖訊息
-            elif message_type == "sticker":
-                sticker_id = event["message"].get("stickerId", "")
-                sheet.append_row([taiwan_time, user_id, f"Sticker ID: {sticker_id}"])
-                print(f"接收到貼圖 ID: {sticker_id}")
-
-            # 處理檔案訊息
-            elif message_type == "file":
-                file_name = event["message"].get("fileName", "")
-                sheet.append_row([taiwan_time, user_id, f"File ID: {message_id} (File Name: {file_name})"])
-
-                # 使用 LineBotApi 下載檔案內容
-                message_content = line_bot_api.get_message_content(message_id)
-                file_data = io.BytesIO(message_content.content)
-
-                # 上傳檔案到 Google Drive
-                uploaded_file_id = upload_image_to_drive(file_data, file_name)
-                if uploaded_file_id:
-                    print(f"檔案已上傳到 Google Drive: {uploaded_file_id}")
-                else:
-                    print("檔案上傳失敗")
-
-            print(f"接收到事件: {event}")
             return "OK"
         else:
             print("沒有事件需要處理")

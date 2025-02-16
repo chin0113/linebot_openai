@@ -12,6 +12,7 @@ import pytz
 from linebot import LineBotApi
 from linebot.models import TextSendMessage, ImageSendMessage
 import urllib.parse
+import time
 
 # Line 群發注意事項：
 
@@ -115,7 +116,18 @@ def is_new_user(user_id):
         if record['id'] == user_id:
             return False  # 找到 userId，表示已存在
     return True  # 沒找到，表示是新使用者
-    
+
+# 定義自動重試機制
+def retry_function(func, retries=3, delay=2):
+    for attempt in range(retries):
+        try:
+            return func()
+        except Exception as e:
+            print(f"發生錯誤: {e}，重試 {attempt + 1}/{retries}...")
+            time.sleep(delay)
+    print("多次重試仍然失敗")
+    return "Internal Server Error", 500
+
 @app.route("/", methods=["GET"])
 def keep_alive():
     return "OK", 200
@@ -182,80 +194,82 @@ def linebot():
     body = request.get_data(as_text=True)
     signature = request.headers.get("X-Line-Signature")
 
-    try:
-        json_data = json.loads(body)
-        print(f"收到的 JSON: {json.dumps(json_data, indent=2)}")  # Debugging
+    def process_request():
+        try:
+            json_data = json.loads(body)
+            print(f"收到的 JSON: {json.dumps(json_data, indent=2)}")  # Debugging
 
-        if "events" in json_data:
-            for event in json_data["events"]:  # 遍歷所有事件
-                print(f"處理事件: {event}")  # Debugging
+            if "events" in json_data:
+                for event in json_data["events"]:  # 遍歷所有事件
+                    print(f"處理事件: {event}")  # Debugging
 
-                user_id = event["source"]["userId"]
-                message_type = event["message"].get("type", "")
-                message_id = event["message"].get("id", "")
+                    user_id = event["source"]["userId"]
+                    message_type = event["message"].get("type", "")
+                    message_id = event["message"].get("id", "")
 
-                # 獲取台灣時間
-                taiwan_tz = pytz.timezone("Asia/Taipei")
-                taiwan_time = datetime.datetime.now(taiwan_tz).strftime("%Y-%m-%d %H:%M:%S")
+                    # 獲取台灣時間
+                    taiwan_tz = pytz.timezone("Asia/Taipei")
+                    taiwan_time = datetime.datetime.now(taiwan_tz).strftime("%Y-%m-%d %H:%M:%S")
 
-                # 檢查是否為新使用者
-                new_user_flag = "new" if is_new_user(user_id) else ""
-                
-                # 處理文字訊息
-                if message_type == "text":
-                    message_text = event["message"].get("text", "")
-                    print(f"收到文字訊息: {message_text}")  # Debugging
+                    # 檢查是否為新使用者
+                    new_user_flag = "new" if is_new_user(user_id) else ""
+                    
+                    # 處理文字訊息
+                    if message_type == "text":
+                        message_text = event["message"].get("text", "")
+                        print(f"收到文字訊息: {message_text}")  # Debugging
 
-                    try:
-                        sheet.append_row([taiwan_time, user_id, message_text, new_user_flag])
-                        print("文字訊息成功寫入 Google Sheet")
-                    except Exception as sheet_error:
-                        print(f"寫入 Google Sheet 失敗: {sheet_error}")
+                        try:
+                            sheet.append_row([taiwan_time, user_id, message_text, new_user_flag])
+                            print("文字訊息成功寫入 Google Sheet")
+                        except Exception as sheet_error:
+                            print(f"寫入 Google Sheet 失敗: {sheet_error}")
 
-                # 處理圖片訊息
-                elif message_type == "image":
-                    print(f"收到圖片訊息: {message_id}")  # Debugging
+                    # 處理圖片訊息
+                    elif message_type == "image":
+                        print(f"收到圖片訊息: {message_id}")  # Debugging
 
-                    try:
-                        sheet.append_row([taiwan_time, user_id, f"image id: {message_id}", new_user_flag])
-                        print("圖片訊息成功寫入 Google Sheet")
-                    except Exception as sheet_error:
-                        print(f"寫入 Google Sheet 失敗: {sheet_error}")
+                        try:
+                            sheet.append_row([taiwan_time, user_id, f"image id: {message_id}", new_user_flag])
+                            print("圖片訊息成功寫入 Google Sheet")
+                        except Exception as sheet_error:
+                            print(f"寫入 Google Sheet 失敗: {sheet_error}")
 
-                    # 獲取 class 和 std
-                    class_name, std_name = get_class_std_from_user_id(user_id)
-                    file_name = f"{class_name}_{std_name}_{message_id}.jpg" if class_name and std_name else f"{message_id}.jpg"
+                        # 獲取 class 和 std
+                        class_name, std_name = get_class_std_from_user_id(user_id)
+                        file_name = f"{class_name}_{std_name}_{message_id}.jpg" if class_name and std_name else f"{message_id}.jpg"
 
-                    # 下載圖片內容
-                    message_content = line_bot_api.get_message_content(message_id)
-                    image_data = io.BytesIO(message_content.content)
+                        # 下載圖片內容
+                        message_content = line_bot_api.get_message_content(message_id)
+                        image_data = io.BytesIO(message_content.content)
 
-                    # 上傳圖片到 Google Drive
-                    uploaded_file_id = upload_image_to_drive(image_data, file_name)
-                    if uploaded_file_id:
-                        print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
-                    else:
-                        print("圖片上傳失敗")
+                        # 上傳圖片到 Google Drive
+                        uploaded_file_id = upload_image_to_drive(image_data, file_name)
+                        if uploaded_file_id:
+                            print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
+                        else:
+                            print("圖片上傳失敗")
 
-                # 處理貼圖訊息
-                elif message_type == "sticker":
-                    sticker_id = event["message"].get("stickerId", "")
-                    print(f"收到貼圖訊息: Sticker ID {sticker_id}")  # Debugging
+                    # 處理貼圖訊息
+                    elif message_type == "sticker":
+                        sticker_id = event["message"].get("stickerId", "")
+                        print(f"收到貼圖訊息: Sticker ID {sticker_id}")  # Debugging
 
-                    try:
-                        sheet.append_row([taiwan_time, user_id, f"sticker id: {sticker_id}", new_user_flag])
-                        print("貼圖訊息成功寫入 Google Sheet")
-                    except Exception as sheet_error:
-                        print(f"寫入 Google Sheet 失敗: {sheet_error}")
+                        try:
+                            sheet.append_row([taiwan_time, user_id, f"sticker id: {sticker_id}", new_user_flag])
+                            print("貼圖訊息成功寫入 Google Sheet")
+                        except Exception as sheet_error:
+                            print(f"寫入 Google Sheet 失敗: {sheet_error}")
 
-            return "OK"
-        else:
-            print("沒有事件需要處理")
-            return "No Event", 200
-
-    except Exception as e:
-        print(f"發生未預期的錯誤: {e}")
-        return "Internal Server Error", 500
+                return "OK"
+            else:
+                print("沒有事件需要處理")
+                return "No Event", 200
+        except Exception as e:
+            print(f"發生未預期的錯誤: {e}")
+            raise e  # 讓 retry_function 捕捉錯誤並重試
+    
+    return retry_function(process_request)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)

@@ -25,7 +25,7 @@ import time
 # 注意！圖檔要上傳到網站
 # 注意！圖檔要上傳到網站
 
-# 第 43、44 行左右
+# 第 44、46 行左右
 # MAIL_SPREADSHEET_ID 需先用測試
 # MAIL_SPREADSHEET_ID 需先用測試
 # MAIL_SPREADSHEET_ID 需先用測試
@@ -39,7 +39,7 @@ line_bot_api = LineBotApi(LINE_ACCESS_TOKEN)
 
 # Google Sheets API 和 Google Drive API 的憑證檔案
 SHEET_CREDENTIALS_FILE = "newagent-gfvg-4f6c0497de66.json"
-SPREADSHEET_NAME = "LineMessages"
+MSG_SPREADSHEET_ID = "1p6K5yoQLMnAoS5eLRGEYUVcuI6pIzifmg7VunZHUWR0"
 LINE_ID_SPREADSHEET_ID = "1uuIEQdD_maLJFG3Qj-gIPWw0w5Ph0leRyrOed_LNmOM"
 #正式
 #MAIL_SPREADSHEET_ID = "1w5brdzpIELPZaKa8C_QGcRK1byZLXXQwBz1FM0rsqVA"
@@ -66,7 +66,7 @@ sheet_credentials = Credentials.from_service_account_file(
 gc = gspread.authorize(sheet_credentials)
 
 # 開啟 Google Sheets
-sheet = gc.open(SPREADSHEET_NAME).sheet1
+sheet = gc.open_by_key(MSG_SPREADSHEET_ID).sheet1
 line_id_sheet = gc.open_by_key(LINE_ID_SPREADSHEET_ID).sheet1
 mail_sheet = gc.open_by_key(MAIL_SPREADSHEET_ID).sheet1
 

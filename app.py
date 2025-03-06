@@ -13,7 +13,7 @@ from linebot import LineBotApi
 from linebot.models import TextSendMessage, ImageSendMessage
 import urllib.parse
 import time
-
+'''
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -21,7 +21,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.exceptions import RefreshError
-
+'''
 # Line 群發注意事項：
 
 # 第 139、140 行左右

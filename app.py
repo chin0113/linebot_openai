@@ -13,6 +13,7 @@ from linebot import LineBotApi
 from linebot.models import TextSendMessage, ImageSendMessage
 import urllib.parse
 import time
+import yagmail
 '''
 import smtplib
 from email.mime.text import MIMEText
@@ -327,8 +328,33 @@ def linebot():
                         uploaded_file_id = upload_image_to_drive(image_data, file_name)
                         if uploaded_file_id:
                             print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
-                        else:
-                            print("圖片上傳失敗")
+                            GCP_CREDENTIALS = os.getenv("GCP_CREDENTIALS")
+                            
+                            # 解析 JSON 字符串為字典
+                            credentials_dict = json.loads(GCP_CREDENTIALS)
+
+                            # 設定發件人與收件人
+                            EMAIL_ADDRESS = "chean0847@gmail.com"
+
+                            # 初始化 Yagmail
+                            try:
+                                yag = yagmail.SMTP(EMAIL_ADDRESS, oauth2_file=credentials_dict)
+                            except Exception as e:
+                                print(f"無法初始化 Yagmail，請確認 OAuth2 設定: {e}")
+                                exit(1)
+
+                            # 發送郵件
+                            try:
+                                yag.send(
+                                    to=EMAIL_ADDRESS,
+                                    subject="test",
+                                    contents=""
+                                )
+                                print("郵件已成功發送！")
+                            except Exception as e:
+                                print(f"發送郵件時出現錯誤: {e}")
+                            else:
+                                print("圖片上傳失敗")
 
                         # 檢查檔名是否包含「女」
                         #if "女" in file_name:

@@ -18,7 +18,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
+from google.oauth2.service_account import Credentials  # 修正這一行
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.exceptions import RefreshError
 
@@ -98,14 +98,12 @@ def get_credentials():
     else:
         raise ValueError("GCP_CREDENTIALS 環境變數未設置")
 
-    # 解碼 token.json 並載入憑證
-    if token_json_b64:
-        try:
-            token_json = json.loads(base64.b64decode(token_json_b64).decode("utf-8"))
-            creds = Credentials.from_authorized_user_info(token_json, SCOPES)
-        except Exception as e:
-            print(f"解析 GCP_TOKEN 失敗: {e}")
-            creds = None  # 可能需要重新驗證
+    # 解碼 credentials.json
+    if creds_json_b64:
+        credentials_dict = json.loads(base64.b64decode(creds_json_b64).decode("utf-8"))
+        creds = Credentials.from_service_account_info(credentials_dict, scopes=SCOPES)
+    else:
+        raise ValueError("GCP_CREDENTIALS 環境變數未設置")
 
     # 如果憑證過期，則自動更新
     if not creds or not creds.valid:

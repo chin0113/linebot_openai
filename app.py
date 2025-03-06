@@ -83,7 +83,7 @@ FOLDER_ID = '11f2Z7Js8uBYWR-h4UUfbBPDZNKzx9qYO'
 
 # 設定 Gmail API 權限範圍
 SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
-
+'''
 def get_credentials():
     creds = None
 
@@ -152,7 +152,7 @@ def send_email(subject, body):
         print("郵件已成功發送！")
     except Exception as e:
         print(f"郵件發送失敗: {e}")
-    
+'''
 def get_drive_service():
     """登入並返回 Google Drive API 服務對象"""
     service = build('drive', 'v3', credentials=drive_credentials)
@@ -331,8 +331,8 @@ def linebot():
                             print("圖片上傳失敗")
 
                         # 檢查檔名是否包含「女」
-                        if "女" in file_name:
-                            send_email(file_name, "")  # 發送郵件
+                        #if "女" in file_name:
+                        #    send_email(file_name, "")  # 發送郵件
 
                     # 處理貼圖訊息
                     elif message_type == "sticker":

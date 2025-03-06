@@ -133,20 +133,27 @@ def get_credentials():
 # 發送郵件
 def send_email(subject, body):
     creds = get_credentials()
-    service = smtplib.SMTP("smtp.gmail.com", 587)
-    service.starttls()
-    service.login("chean0847@gmail.com", creds.token)
 
+    # 使用 Google API 建立 Gmail 服務
+    service = build("gmail", "v1", credentials=creds)
+
+    # 建立郵件內容
     msg = MIMEMultipart()
     msg["From"] = "chean0847@gmail.com"
     msg["To"] = "chean0847@gmail.com"
     msg["Subject"] = subject
-
     msg.attach(MIMEText(body, "plain"))
 
-    service.sendmail("chean0847@gmail.com", "chean0847@gmail.com", msg.as_string())
-    service.quit()
-    print("郵件已發送")
+    # 將郵件轉為 Base64 格式 (Gmail API 需要)
+    raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+    message = {"raw": raw_message}
+
+    # 透過 Gmail API 發送郵件
+    try:
+        service.users().messages().send(userId="me", body=message).execute()
+        print("郵件已成功發送！")
+    except Exception as e:
+        print(f"郵件發送失敗: {e}")
     
 def get_drive_service():
     """登入並返回 Google Drive API 服務對象"""

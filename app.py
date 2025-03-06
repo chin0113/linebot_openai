@@ -14,6 +14,14 @@ from linebot.models import TextSendMessage, ImageSendMessage
 import urllib.parse
 import time
 
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.exceptions import RefreshError
+
 # Line 群發注意事項：
 
 # 第 139、140 行左右
@@ -73,6 +81,73 @@ mail_sheet = gc.open_by_key(MAIL_SPREADSHEET_ID).sheet1
 # Google Drive API 的資料夾ID
 FOLDER_ID = '11f2Z7Js8uBYWR-h4UUfbBPDZNKzx9qYO'
 
+# 設定 Gmail API 權限範圍
+SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
+
+# 讀取 OAuth 憑證
+def get_credentials():
+    creds = None
+
+    # 從環境變數讀取 Base64 編碼的 credentials.json
+    creds_json_b64 = os.getenv("GCP_CREDENTIALS")
+    token_json_b64 = os.getenv("GCP_TOKEN")
+
+    # 解碼 credentials.json
+    if creds_json_b64:
+        creds_json = json.loads(base64.b64decode(creds_json_b64).decode("utf-8"))
+    else:
+        raise ValueError("GCP_CREDENTIALS 環境變數未設置")
+
+    # 解碼 token.json 並載入憑證
+    if token_json_b64:
+        try:
+            token_json = json.loads(base64.b64decode(token_json_b64).decode("utf-8"))
+            creds = Credentials.from_authorized_user_info(token_json, SCOPES)
+        except Exception as e:
+            print(f"解析 GCP_TOKEN 失敗: {e}")
+            creds = None  # 可能需要重新驗證
+
+    # 如果憑證過期，則自動更新
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+                print("Token 已更新")
+            except RefreshError:
+                print("無法更新 Token，將重新驗證")
+                creds = None  # 需要重新驗證
+
+        if not creds:
+            flow = InstalledAppFlow.from_client_config(creds_json, SCOPES)
+            creds = flow.run_local_server(port=0)
+
+            # 重新編碼新的 Token，存回環境變數 (Render 無法直接修改環境變數，但可以手動更新)
+            new_token_json = creds.to_json()
+            new_token_b64 = base64.b64encode(new_token_json.encode("utf-8")).decode("utf-8")
+
+            print("請手動更新 Render 環境變數 GCP_TOKEN，新的值如下：")
+            print(new_token_b64)
+
+    return creds
+
+# 發送郵件
+def send_email(subject, body):
+    creds = get_credentials()
+    service = smtplib.SMTP("smtp.gmail.com", 587)
+    service.starttls()
+    service.login("chean0847@gmail.com", creds.token)
+
+    msg = MIMEMultipart()
+    msg["From"] = "chean0847@gmail.com"
+    msg["To"] = "chean0847@gmail.com"
+    msg["Subject"] = subject
+
+    msg.attach(MIMEText(body, "plain"))
+
+    service.sendmail("chean0847@gmail.com", "chean0847@gmail.com", msg.as_string())
+    service.quit()
+    print("郵件已發送")
+    
 def get_drive_service():
     """登入並返回 Google Drive API 服務對象"""
     service = build('drive', 'v3', credentials=drive_credentials)
@@ -249,6 +324,10 @@ def linebot():
                             print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
                         else:
                             print("圖片上傳失敗")
+
+                        # 檢查檔名是否包含「女」
+                        if "女" in file_name:
+                            send_email(file_name, "")  # 發送郵件
 
                     # 處理貼圖訊息
                     elif message_type == "sticker":

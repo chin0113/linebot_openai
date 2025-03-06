@@ -90,11 +90,17 @@ if not GCP_CREDENTIALS:
 # 解析 JSON
 credentials_dict = json.loads(GCP_CREDENTIALS)
 
-# 設定 Gmail OAuth2
+# 設定發件人 Email
 EMAIL_ADDRESS = credentials_dict["email_address"]
 
+# 把 JSON 憑證存成一個暫存檔案
+TEMP_CREDENTIALS_FILE = "/tmp/gcp_credentials.json"
+with open(TEMP_CREDENTIALS_FILE, "w") as f:
+    json.dump(credentials_dict, f)
+
+# 初始化 Yagmail（改用 `oauth2_file`）
 try:
-    yag = yagmail.SMTP(EMAIL_ADDRESS, oauth2_info=credentials_dict)
+    yag = yagmail.SMTP(EMAIL_ADDRESS, oauth2_file=TEMP_CREDENTIALS_FILE)
 except Exception as e:
     print(f"無法初始化 Yagmail，請確認 OAuth2 設定: {e}")
     exit(1)
@@ -110,6 +116,7 @@ def send_email():
         return jsonify({"status": "success", "message": "郵件已成功發送！"})
     except Exception as e:
         return jsonify({"status": "error", "message": f"發送郵件時出現錯誤: {e}"})
+
 
 '''
 def get_credentials():

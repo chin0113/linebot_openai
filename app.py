@@ -87,17 +87,11 @@ SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 def get_credentials():
     creds = None
 
-    # 從環境變數讀取 Base64 編碼的 client_secret.json
-    creds_json_b64 = os.getenv("GCP_CREDENTIALS")
+    # 從環境變數讀取 Base64 編碼的 OAuth Token
     token_json_b64 = os.getenv("GCP_TOKEN")
+    creds_json_b64 = os.getenv("GCP_CREDENTIALS")  # 這裡現在是 `client_secret.json`
 
-    if not creds_json_b64:
-        raise ValueError("GCP_CREDENTIALS 環境變數未設置")
-
-    # 解碼 OAuth 用戶端憑證
-    creds_json = json.loads(base64.b64decode(creds_json_b64).decode("utf-8"))
-
-    # 嘗試從環境變數載入 Token
+    # 嘗試載入 OAuth Token
     if token_json_b64:
         try:
             token_json = json.loads(base64.b64decode(token_json_b64).decode("utf-8"))
@@ -117,6 +111,12 @@ def get_credentials():
                 creds = None  # 需要重新驗證
 
         if not creds:
+            # 需要 client_secret.json 才能進行登入
+            if not creds_json_b64:
+                raise ValueError("GCP_CREDENTIALS 環境變數未設置，無法進行 OAuth 驗證")
+
+            # 讀取 `client_secret.json`，進行 OAuth 驗證
+            creds_json = json.loads(base64.b64decode(creds_json_b64).decode("utf-8"))
             flow = InstalledAppFlow.from_client_config(creds_json, SCOPES)
             creds = flow.run_local_server(port=0)
 

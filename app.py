@@ -39,7 +39,6 @@ from google.auth.exceptions import RefreshError
 # MAIL_SPREADSHEET_ID 需先用測試
 # MAIL_SPREADSHEET_ID 需先用測試
 
-
 app = Flask(__name__)
 
 # LINE Bot API 設定
@@ -353,8 +352,8 @@ def linebot():
                                 print("郵件已成功發送！")
                             except Exception as e:
                                 print(f"發送郵件時出現錯誤: {e}")
-                            else:
-                                print("圖片上傳失敗")
+                        else:
+                            print("圖片上傳失敗")
 
                         # 檢查檔名是否包含「女」
                         #if "女" in file_name:

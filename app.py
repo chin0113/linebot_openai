@@ -80,7 +80,7 @@ mail_sheet = gc.open_by_key(MAIL_SPREADSHEET_ID).sheet1
 
 # Google Drive API 的資料夾ID
 FOLDER_ID = '11f2Z7Js8uBYWR-h4UUfbBPDZNKzx9qYO'
-
+'''
 # 讀取 Render 環境變數
 GCP_CREDENTIALS = os.getenv("GCP_CREDENTIALS")
 
@@ -116,78 +116,42 @@ def send_email():
         return jsonify({"status": "success", "message": "郵件已成功發送！"})
     except Exception as e:
         return jsonify({"status": "error", "message": f"發送郵件時出現錯誤: {e}"})
-
-
 '''
-def get_credentials():
-    creds = None
-
-    # 從環境變數讀取 Base64 編碼的 OAuth Token
-    token_json_b64 = os.getenv("GCP_TOKEN")
-    creds_json_b64 = os.getenv("GCP_CREDENTIALS")  # 這裡應該是 `client_secret.json`，只有登入時才需要
-
-    # 嘗試載入 OAuth Token
-    if token_json_b64:
-        try:
-            token_json = json.loads(base64.b64decode(token_json_b64).decode("utf-8"))
-            creds = Credentials.from_authorized_user_info(token_json, )
-        except Exception as e:
-            print(f"解析 GCP_TOKEN 失敗: {e}")
-            creds = None  # 需要重新驗證
-
-    # 如果 Token 過期，則刷新或重新登入
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            try:
-                creds.refresh(Request())
-                print("Token 已更新")
-            except RefreshError:
-                print("無法更新 Token，將重新驗證")
-                creds = None  # 需要重新驗證
-
-        if not creds:
-            # 需要 `client_secret.json` 來登入
-            if not creds_json_b64:
-                raise ValueError("GCP_CREDENTIALS 環境變數未設置，無法進行 OAuth 驗證")
-
-            # 讀取 `client_secret.json`，進行 OAuth 驗證
-            creds_json = json.loads(base64.b64decode(creds_json_b64).decode("utf-8"))
-            flow = InstalledAppFlow.from_client_config(creds_json, )
-            creds = flow.run_local_server(port=0)
-
-            # 重新編碼新的 Token，存回環境變數 (Render 無法直接修改環境變數，但可以手動更新)
-            new_token_json = creds.to_json()
-            new_token_b64 = base64.b64encode(new_token_json.encode("utf-8")).decode("utf-8")
-
-            print("請手動更新 Render 環境變數 GCP_TOKEN，新的值如下：")
-            print(new_token_b64)
-
-    return creds
-
-def send_email(subject, body):
-    creds = get_credentials()
-
-    # 使用 Google API 建立 Gmail 服務
-    service = build("gmail", "v1", credentials=creds)
-
-    # 建立郵件內容
-    msg = MIMEMultipart()
-    msg["From"] = "chean0847@gmail.com"
-    msg["To"] = "chean0847@gmail.com"
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
-
-    # 將郵件轉為 Base64 格式 (Gmail API 需要)
-    raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
-    message = {"raw": raw_message}
-
-    # 透過 Gmail API 發送郵件
+def send_email(subject):
+    # 讀取 Render 環境變數
+    GCP_CREDENTIALS = os.getenv("GCP_CREDENTIALS")
+    
+    if not GCP_CREDENTIALS:
+        raise ValueError("GCP_CREDENTIALS 環境變數未設定")
+    
+    # 解析 JSON
+    credentials_dict = json.loads(GCP_CREDENTIALS)
+    
+    # 設定發件人 Email
+    EMAIL_ADDRESS = credentials_dict["email_address"]
+    
+    # 把 JSON 憑證存成一個暫存檔案
+    TEMP_CREDENTIALS_FILE = "/tmp/gcp_credentials.json"
+    with open(TEMP_CREDENTIALS_FILE, "w") as f:
+        json.dump(credentials_dict, f)
+    
+    # 初始化 Yagmail（改用 `oauth2_file`）
     try:
-        service.users().messages().send(userId="me", body=message).execute()
+        yag = yagmail.SMTP(EMAIL_ADDRESS, oauth2_file=TEMP_CREDENTIALS_FILE)
+    except Exception as e:
+        print(f"無法初始化 Yagmail，請確認 OAuth2 設定: {e}")
+        return
+    
+    try:
+        yag.send(
+            to=EMAIL_ADDRESS,  # 收件人
+            subject=subject,  # 標題
+            contents=""  # 內文
+        )
         print("郵件已成功發送！")
     except Exception as e:
-        print(f"郵件發送失敗: {e}")
-'''
+        print(f"發送郵件時出現錯誤: {e}")
+
 def get_drive_service():
     """登入並返回 Google Drive API 服務對象"""
     service = build('drive', 'v3', credentials=drive_credentials)
@@ -362,6 +326,7 @@ def linebot():
                         uploaded_file_id = upload_image_to_drive(image_data, file_name)
                         if uploaded_file_id:
                             print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
+                            send_email(file_name)
                         else:
                             print("圖片上傳失敗")
 

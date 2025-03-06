@@ -18,7 +18,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from google.auth.transport.requests import Request
-from google.oauth2.service_account import Credentials  # 修正這一行
+from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.exceptions import RefreshError
 
@@ -84,28 +84,29 @@ FOLDER_ID = '11f2Z7Js8uBYWR-h4UUfbBPDZNKzx9qYO'
 # 設定 Gmail API 權限範圍
 SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 
-# 讀取 OAuth 憑證
 def get_credentials():
     creds = None
 
-    # 從環境變數讀取 Base64 編碼的 credentials.json
+    # 從環境變數讀取 Base64 編碼的 client_secret.json
     creds_json_b64 = os.getenv("GCP_CREDENTIALS")
     token_json_b64 = os.getenv("GCP_TOKEN")
 
-    # 解碼 credentials.json
-    if creds_json_b64:
-        creds_json = json.loads(base64.b64decode(creds_json_b64).decode("utf-8"))
-    else:
+    if not creds_json_b64:
         raise ValueError("GCP_CREDENTIALS 環境變數未設置")
 
-    # 解碼 credentials.json
-    if creds_json_b64:
-        credentials_dict = json.loads(base64.b64decode(creds_json_b64).decode("utf-8"))
-        creds = Credentials.from_service_account_info(credentials_dict, scopes=SCOPES)
-    else:
-        raise ValueError("GCP_CREDENTIALS 環境變數未設置")
+    # 解碼 OAuth 用戶端憑證
+    creds_json = json.loads(base64.b64decode(creds_json_b64).decode("utf-8"))
 
-    # 如果憑證過期，則自動更新
+    # 嘗試從環境變數載入 Token
+    if token_json_b64:
+        try:
+            token_json = json.loads(base64.b64decode(token_json_b64).decode("utf-8"))
+            creds = Credentials.from_authorized_user_info(token_json, SCOPES)
+        except Exception as e:
+            print(f"解析 GCP_TOKEN 失敗: {e}")
+            creds = None  # 需要重新驗證
+
+    # 如果 Token 過期，則刷新或重新登入
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             try:
@@ -128,7 +129,6 @@ def get_credentials():
 
     return creds
 
-# 發送郵件
 def send_email(subject, body):
     creds = get_credentials()
 

@@ -81,8 +81,36 @@ mail_sheet = gc.open_by_key(MAIL_SPREADSHEET_ID).sheet1
 # Google Drive API 的資料夾ID
 FOLDER_ID = '11f2Z7Js8uBYWR-h4UUfbBPDZNKzx9qYO'
 
-# 設定 Gmail API 權限範圍
-SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
+# 讀取 Render 環境變數
+GCP_CREDENTIALS = os.getenv("GCP_CREDENTIALS")
+
+if not GCP_CREDENTIALS:
+    raise ValueError("GCP_CREDENTIALS 環境變數未設定")
+
+# 解析 JSON
+credentials_dict = json.loads(GCP_CREDENTIALS)
+
+# 設定 Gmail OAuth2
+EMAIL_ADDRESS = credentials_dict["email_address"]
+
+try:
+    yag = yagmail.SMTP(EMAIL_ADDRESS, oauth2_info=credentials_dict)
+except Exception as e:
+    print(f"無法初始化 Yagmail，請確認 OAuth2 設定: {e}")
+    exit(1)
+
+@app.route("/send-email", methods=["POST"])
+def send_email():
+    try:
+        yag.send(
+            to=EMAIL_ADDRESS,  # 收件人
+            subject="test",  # 標題
+            contents=""  # 內文
+        )
+        return jsonify({"status": "success", "message": "郵件已成功發送！"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"發送郵件時出現錯誤: {e}"})
+
 '''
 def get_credentials():
     creds = None
@@ -95,7 +123,7 @@ def get_credentials():
     if token_json_b64:
         try:
             token_json = json.loads(base64.b64decode(token_json_b64).decode("utf-8"))
-            creds = Credentials.from_authorized_user_info(token_json, SCOPES)
+            creds = Credentials.from_authorized_user_info(token_json, )
         except Exception as e:
             print(f"解析 GCP_TOKEN 失敗: {e}")
             creds = None  # 需要重新驗證
@@ -117,7 +145,7 @@ def get_credentials():
 
             # 讀取 `client_secret.json`，進行 OAuth 驗證
             creds_json = json.loads(base64.b64decode(creds_json_b64).decode("utf-8"))
-            flow = InstalledAppFlow.from_client_config(creds_json, SCOPES)
+            flow = InstalledAppFlow.from_client_config(creds_json, )
             creds = flow.run_local_server(port=0)
 
             # 重新編碼新的 Token，存回環境變數 (Render 無法直接修改環境變數，但可以手動更新)
@@ -327,31 +355,6 @@ def linebot():
                         uploaded_file_id = upload_image_to_drive(image_data, file_name)
                         if uploaded_file_id:
                             print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
-                            GCP_CREDENTIALS = os.getenv("GCP_CREDENTIALS")
-                            
-                            # 解析 JSON 字符串為字典
-                            credentials_dict = json.loads(GCP_CREDENTIALS)
-
-                            # 設定發件人與收件人
-                            EMAIL_ADDRESS = "chean0847@gmail.com"
-
-                            # 初始化 Yagmail
-                            try:
-                                yag = yagmail.SMTP(EMAIL_ADDRESS, oauth2_file=credentials_dict)
-                            except Exception as e:
-                                print(f"無法初始化 Yagmail，請確認 OAuth2 設定: {e}")
-                                exit(1)
-
-                            # 發送郵件
-                            try:
-                                yag.send(
-                                    to=EMAIL_ADDRESS,
-                                    subject="test",
-                                    contents=""
-                                )
-                                print("郵件已成功發送！")
-                            except Exception as e:
-                                print(f"發送郵件時出現錯誤: {e}")
                         else:
                             print("圖片上傳失敗")
 

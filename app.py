@@ -89,7 +89,7 @@ def get_credentials():
 
     # 從環境變數讀取 Base64 編碼的 OAuth Token
     token_json_b64 = os.getenv("GCP_TOKEN")
-    creds_json_b64 = os.getenv("GCP_CREDENTIALS")  # 這裡現在是 `client_secret.json`
+    creds_json_b64 = os.getenv("GCP_CREDENTIALS")  # 這裡應該是 `client_secret.json`，只有登入時才需要
 
     # 嘗試載入 OAuth Token
     if token_json_b64:
@@ -111,7 +111,7 @@ def get_credentials():
                 creds = None  # 需要重新驗證
 
         if not creds:
-            # 需要 client_secret.json 才能進行登入
+            # 需要 `client_secret.json` 來登入
             if not creds_json_b64:
                 raise ValueError("GCP_CREDENTIALS 環境變數未設置，無法進行 OAuth 驗證")
 

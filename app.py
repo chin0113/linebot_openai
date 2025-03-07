@@ -26,7 +26,7 @@ from google.auth.exceptions import RefreshError
 '''
 # Line 群發注意事項：
 
-# 第 139、140 行左右
+# 第 206 行左右
 # 注意！要先定義班級 std_class 和作文主題 title
 # 注意！要先定義班級 std_class 和作文主題 title
 # 注意！要先定義班級 std_class 和作文主題 title
@@ -35,7 +35,7 @@ from google.auth.exceptions import RefreshError
 # 注意！圖檔要上傳到網站
 # 注意！圖檔要上傳到網站
 
-# 第 44、46 行左右
+# 第 53 行左右
 # MAIL_SPREADSHEET_ID 需先用測試
 # MAIL_SPREADSHEET_ID 需先用測試
 # MAIL_SPREADSHEET_ID 需先用測試
@@ -195,6 +195,10 @@ def retry_function(func, retries=3, delay=2):
 def keep_alive():
     return "OK", 200
 
+@app.route("/healthz", methods=["GET"])
+def health_check():
+    return "OK", 200
+    
 @app.route("/send", methods=["GET"])
 def send_messages():
     try:

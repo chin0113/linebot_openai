@@ -14,6 +14,7 @@ from linebot.models import TextSendMessage, ImageSendMessage
 import urllib.parse
 import time
 import yagmail
+from google.auth.exceptions import TransportError
 '''
 import smtplib
 from email.mime.text import MIMEText
@@ -80,43 +81,21 @@ mail_sheet = gc.open_by_key(MAIL_SPREADSHEET_ID).sheet1
 
 # Google Drive API 的資料夾ID
 FOLDER_ID = '11f2Z7Js8uBYWR-h4UUfbBPDZNKzx9qYO'
-'''
-# 讀取 Render 環境變數
-GCP_CREDENTIALS = os.getenv("GCP_CREDENTIALS")
 
-if not GCP_CREDENTIALS:
-    raise ValueError("GCP_CREDENTIALS 環境變數未設定")
-
-# 解析 JSON
-credentials_dict = json.loads(GCP_CREDENTIALS)
-
-# 設定發件人 Email
-EMAIL_ADDRESS = credentials_dict["email_address"]
-
-# 把 JSON 憑證存成一個暫存檔案
-TEMP_CREDENTIALS_FILE = "/tmp/gcp_credentials.json"
-with open(TEMP_CREDENTIALS_FILE, "w") as f:
-    json.dump(credentials_dict, f)
-
-# 初始化 Yagmail（改用 `oauth2_file`）
-try:
-    yag = yagmail.SMTP(EMAIL_ADDRESS, oauth2_file=TEMP_CREDENTIALS_FILE)
-except Exception as e:
-    print(f"無法初始化 Yagmail，請確認 OAuth2 設定: {e}")
-    exit(1)
-
-@app.route("/send-email", methods=["POST"])
-def send_email():
-    try:
-        yag.send(
-            to=EMAIL_ADDRESS,  # 收件人
-            subject="test",  # 標題
-            contents=""  # 內文
-        )
-        return jsonify({"status": "success", "message": "郵件已成功發送！"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": f"發送郵件時出現錯誤: {e}"})
-'''
+def safe_get_records(sheet, retries=5):
+    """安全地讀取 Google Sheets 資料，最多重試 5 次"""
+    for attempt in range(retries):
+        try:
+            return sheet.get_all_records()
+        except TransportError as e:
+            print(f"Google Sheets API 讀取失敗 (TransportError)，重試 {attempt+1}/{retries} 次...: {e}")
+            time.sleep(2**attempt)  # 2 的指數次回退
+        except Exception as e:
+            print(f"Google Sheets API 讀取失敗，重試 {attempt+1}/{retries} 次...: {e}")
+            time.sleep(2**attempt)
+    print("Google Sheets API 讀取失敗，請確認 API 設定或網路狀況")
+    return []
+    
 def send_email(subject):
     # 讀取 Render 環境變數
     GCP_CREDENTIALS = os.getenv("GCP_CREDENTIALS")
@@ -187,7 +166,7 @@ def upload_image_to_drive(image_data, file_name):
     except Exception as e:
         print(f"圖片上傳失敗: {e}")
         return None
-
+'''
 def is_new_user(user_id):
     """檢查 user_id 是否存在於 LINE_ID_SPREADSHEET 的 id 欄位"""
     records = line_id_sheet.get_all_records()
@@ -195,8 +174,13 @@ def is_new_user(user_id):
         if record['id'] == user_id:
             return False  # 找到 userId，表示已存在
     return True  # 沒找到，表示是新使用者
-
+''' 
+def is_new_user(user_id):
+    """檢查 user_id 是否存在於 Google Sheets"""
+    records = safe_get_records(line_id_sheet)  # 改用 safe_get_records()
+    return not any(record.get("id") == user_id for record in records)
 # 定義自動重試機制
+
 def retry_function(func, retries=3, delay=2):
     for attempt in range(retries):
         try:

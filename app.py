@@ -26,7 +26,7 @@ from google.auth.exceptions import RefreshError
 '''
 # Line 群發注意事項：
 
-# 第 206 行左右
+# 第 226 行左右
 # 注意！要先定義班級 std_class 和作文主題 title
 # 注意！要先定義班級 std_class 和作文主題 title
 # 注意！要先定義班級 std_class 和作文主題 title
@@ -317,7 +317,7 @@ def linebot():
                         print(f"收到圖片訊息: {message_id}")  # Debugging
 
                         try:
-                            expand_sheet_if_needed(sheet)
+                            #expand_sheet_if_needed(sheet)
                             sheet.append_row([taiwan_time, user_id, f"image id: {message_id}", new_user_flag])
                             print("圖片訊息成功寫入 Google Sheet")
                         except Exception as sheet_error:

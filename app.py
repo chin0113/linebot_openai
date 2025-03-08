@@ -191,16 +191,25 @@ def retry_function(func, retries=3, delay=2):
     print("多次重試仍然失敗")
     return "Internal Server Error", 500
 
-def append_data_to_sheet(sheet, data):
-    """使用 batch_update() 加速 Google Sheets 寫入"""
+def expand_sheet_if_needed(sheet, extra_rows=100):
+    """
+    如果 Google Sheets 行數不足，則擴展行數 (一次增加 extra_rows)
+    """
     try:
-        sheet.batch_update([{
-            "range": f"A{sheet.row_count + 1}:D{sheet.row_count + 1}",
-            "values": [data]
-        }])
-        print("資料成功寫入 Google Sheet")
+        # 取得目前的行數
+        current_rows = len(sheet.get_all_values())
+
+        # 取得 Google Sheets 允許的最大行數 (通常是 10,000，但可以手動擴展)
+        max_rows = sheet.row_count  # 這是 Google Sheets 目前的最大行數限制
+
+        if current_rows >= max_rows:
+            # 增加 `extra_rows`，避免超出 Google Sheets 限制
+            new_max_rows = max_rows + extra_rows
+            sheet.add_rows(extra_rows)
+            print(f"擴展 Google Sheets 行數到 {new_max_rows}")
+
     except Exception as e:
-        print(f"寫入 Google Sheet 失敗: {e}")
+        print(f"擴展 Google Sheets 失敗: {e}")
         
 @app.route("/", methods=["GET"])
 def keep_alive():
@@ -308,8 +317,8 @@ def linebot():
                         print(f"收到圖片訊息: {message_id}")  # Debugging
 
                         try:
-                            #sheet.append_row([taiwan_time, user_id, f"image id: {message_id}", new_user_flag])
-                            append_data_to_sheet(sheet, [taiwan_time, user_id, f"image id: {message_id}", new_user_flag])
+                            expand_sheet_if_needed(sheet)
+                            sheet.append_row([taiwan_time, user_id, f"image id: {message_id}", new_user_flag])
                             print("圖片訊息成功寫入 Google Sheet")
                         except Exception as sheet_error:
                             print(f"寫入 Google Sheet 失敗: {sheet_error}")

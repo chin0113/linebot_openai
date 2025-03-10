@@ -15,6 +15,8 @@ import urllib.parse
 import time
 import yagmail
 from google.auth.exceptions import TransportError
+import time
+
 '''
 import smtplib
 from email.mime.text import MIMEText
@@ -210,7 +212,22 @@ def expand_sheet_if_needed(sheet, extra_rows=100):
 
     except Exception as e:
         print(f"擴展 Google Sheets 失敗: {e}")
-        
+
+def safe_append_row(sheet, row, retries=5):
+    """安全地寫入 Google Sheets，最多重試 5 次"""
+    for attempt in range(retries):
+        try:
+            sheet.append_row(row)
+            print("成功寫入 Google Sheet")
+            return True
+        except TransportError as e:
+            print(f"Google Sheets API 連線錯誤 (TransportError)，重試 {attempt+1}/{retries} 次...: {e}")
+        except Exception as e:
+            print(f"寫入 Google Sheets 失敗，重試 {attempt+1}/{retries} 次...: {e}")
+        time.sleep(2**attempt)  # 2 的指數次回退
+    print("寫入 Google Sheets 失敗，請確認 API 設定或網路狀況")
+    return False  # 最終還是失敗
+    
 @app.route("/", methods=["GET"])
 def keep_alive():
     return "OK", 200
@@ -307,7 +324,8 @@ def linebot():
                         print(f"收到文字訊息: {message_text}")  # Debugging
 
                         try:
-                            sheet.append_row([taiwan_time, user_id, message_text, new_user_flag])
+                            #sheet.append_row([taiwan_time, user_id, message_text, new_user_flag])
+                            safe_append_row(sheet, [taiwan_time, user_id, message_text, new_user_flag])
                             print("文字訊息成功寫入 Google Sheet")
                         except Exception as sheet_error:
                             print(f"寫入 Google Sheet 失敗: {sheet_error}")
@@ -318,7 +336,8 @@ def linebot():
 
                         try:
                             #expand_sheet_if_needed(sheet)
-                            sheet.append_row([taiwan_time, user_id, f"image id: {message_id}", new_user_flag])
+                            #sheet.append_row([taiwan_time, user_id, f"image id: {message_id}", new_user_flag])
+                            safe_append_row(sheet, [taiwan_time, user_id, f"image id: {message_id}", new_user_flag])
                             print("圖片訊息成功寫入 Google Sheet")
                         except Exception as sheet_error:
                             print(f"寫入 Google Sheet 失敗: {sheet_error}")
@@ -349,7 +368,8 @@ def linebot():
                         print(f"收到貼圖訊息: Sticker ID {sticker_id}")  # Debugging
 
                         try:
-                            sheet.append_row([taiwan_time, user_id, f"sticker id: {sticker_id}", new_user_flag])
+                            #sheet.append_row([taiwan_time, user_id, f"sticker id: {sticker_id}", new_user_flag])
+                            safe_append_row(sheet, [taiwan_time, user_id, f"sticker id: {sticker_id}", new_user_flag])
                             print("貼圖訊息成功寫入 Google Sheet")
                         except Exception as sheet_error:
                             print(f"寫入 Google Sheet 失敗: {sheet_error}")

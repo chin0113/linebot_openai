@@ -110,9 +110,9 @@ def send_email(subject):
     except json.JSONDecodeError:
         raise ValueError("GCP_CREDENTIALS 格式錯誤，請檢查環境變數")
 
-    EMAIL_ADDRESS = credentials_dict.get("client_email")
+    EMAIL_ADDRESS = credentials_dict.get("email_address")
     if not EMAIL_ADDRESS:
-        raise ValueError("Google 憑證缺少 `client_email` 欄位")
+        raise ValueError("Google 憑證缺少 `email_address` 欄位")
 
     TEMP_CREDENTIALS_FILE = "/tmp/gcp_credentials.json"
     with open(TEMP_CREDENTIALS_FILE, "w") as f:

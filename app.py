@@ -99,39 +99,44 @@ def safe_get_records(sheet, retries=5):
     return []
     
 def send_email(subject):
-    # 讀取 Render 環境變數
+    """ 使用 Google OAuth2 發送郵件，確保憑證有效 """
     GCP_CREDENTIALS = os.getenv("GCP_CREDENTIALS")
-    
+
     if not GCP_CREDENTIALS:
         raise ValueError("GCP_CREDENTIALS 環境變數未設定")
     
-    # 解析 JSON
-    credentials_dict = json.loads(GCP_CREDENTIALS)
-    
-    # 設定發件人 Email
-    EMAIL_ADDRESS = credentials_dict["email_address"]
-    
-    # 把 JSON 憑證存成一個暫存檔案
+    try:
+        credentials_dict = json.loads(GCP_CREDENTIALS)
+    except json.JSONDecodeError:
+        raise ValueError("GCP_CREDENTIALS 格式錯誤，請檢查環境變數")
+
+    EMAIL_ADDRESS = credentials_dict.get("client_email")
+    if not EMAIL_ADDRESS:
+        raise ValueError("Google 憑證缺少 `client_email` 欄位")
+
     TEMP_CREDENTIALS_FILE = "/tmp/gcp_credentials.json"
     with open(TEMP_CREDENTIALS_FILE, "w") as f:
         json.dump(credentials_dict, f)
-    
-    # 初始化 Yagmail（改用 `oauth2_file`）
+
     try:
         yag = yagmail.SMTP(EMAIL_ADDRESS, oauth2_file=TEMP_CREDENTIALS_FILE)
     except Exception as e:
         print(f"無法初始化 Yagmail，請確認 OAuth2 設定: {e}")
         return
-    
-    try:
-        yag.send(
-            to=EMAIL_ADDRESS,  # 收件人
-            subject=subject,  # 標題
-            contents=""  # 內文
-        )
-        print("郵件已成功發送！")
-    except Exception as e:
-        print(f"發送郵件時出現錯誤: {e}")
+
+    for attempt in range(3):
+        try:
+            yag.send(
+                to=EMAIL_ADDRESS,  
+                subject=subject or "No Subject",  
+                contents="This is a test email."
+            )
+            print("郵件已成功發送！")
+            return
+        except Exception as e:
+            print(f"發送郵件失敗 (嘗試 {attempt+1}/3): {e}")
+            time.sleep(2**attempt)  # 2 的指數次退避
+    print("郵件最終仍然發送失敗")
 
 def get_drive_service():
     """登入並返回 Google Drive API 服務對象"""

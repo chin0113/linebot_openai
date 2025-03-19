@@ -173,20 +173,20 @@ def upload_image_to_drive(image_data, file_name):
     except Exception as e:
         print(f"圖片上傳失敗: {e}")
         return None
-'''
-def is_new_user(user_id):
-    """檢查 user_id 是否存在於 LINE_ID_SPREADSHEET 的 id 欄位"""
-    records = line_id_sheet.get_all_records()
-    for record in records:
-        if record['id'] == user_id:
-            return False  # 找到 userId，表示已存在
-    return True  # 沒找到，表示是新使用者
-''' 
+
 def is_new_user(user_id):
     """檢查 user_id 是否存在於 Google Sheets"""
     records = safe_get_records(line_id_sheet)  # 改用 safe_get_records()
     return not any(record.get("id") == user_id for record in records)
 # 定義自動重試機制
+
+def get_user_name(user_id):
+    """從 LINE_ID_SPREADSHEET_ID 取得 user_name"""
+    records = safe_get_records(line_id_sheet)  # 安全地讀取試算表
+    for record in records:
+        if record.get("id") == user_id:  # 確保 `id` 欄位匹配
+            return record.get("name", "Unknown")  # 預設為 "Unknown" 以防沒有名稱
+    return "Unknown"
 
 def retry_function(func, retries=3, delay=2):
     for attempt in range(retries):
@@ -323,14 +323,17 @@ def linebot():
                     # 檢查是否為新使用者
                     new_user_flag = "new" if is_new_user(user_id) else ""
                     
+                    # 獲取 user_name
+                    user_name = get_user_name(user_id)
+
                     # 處理文字訊息
                     if message_type == "text":
                         message_text = event["message"].get("text", "")
                         print(f"收到文字訊息: {message_text}")  # Debugging
 
                         try:
-                            #sheet.append_row([taiwan_time, user_id, message_text, new_user_flag])
-                            safe_append_row(sheet, [taiwan_time, user_id, message_text, new_user_flag])
+                            # 存入 Google Sheet（包含 user_name）
+                            safe_append_row(sheet, [taiwan_time, user_id, user_name, message_text, new_user_flag])
                             print("文字訊息成功寫入 Google Sheet")
                         except Exception as sheet_error:
                             print(f"寫入 Google Sheet 失敗: {sheet_error}")
@@ -340,9 +343,7 @@ def linebot():
                         print(f"收到圖片訊息: {message_id}")  # Debugging
 
                         try:
-                            #expand_sheet_if_needed(sheet)
-                            #sheet.append_row([taiwan_time, user_id, f"image id: {message_id}", new_user_flag])
-                            safe_append_row(sheet, [taiwan_time, user_id, f"image id: {message_id}", new_user_flag])
+                            safe_append_row(sheet, [taiwan_time, user_id, user_name, f"image id: {message_id}", new_user_flag])
                             print("圖片訊息成功寫入 Google Sheet")
                         except Exception as sheet_error:
                             print(f"寫入 Google Sheet 失敗: {sheet_error}")
@@ -373,8 +374,7 @@ def linebot():
                         print(f"收到貼圖訊息: Sticker ID {sticker_id}")  # Debugging
 
                         try:
-                            #sheet.append_row([taiwan_time, user_id, f"sticker id: {sticker_id}", new_user_flag])
-                            safe_append_row(sheet, [taiwan_time, user_id, f"sticker id: {sticker_id}", new_user_flag])
+                            safe_append_row(sheet, [taiwan_time, user_id, user_name, f"sticker id: {sticker_id}", new_user_flag])
                             print("貼圖訊息成功寫入 Google Sheet")
                         except Exception as sheet_error:
                             print(f"寫入 Google Sheet 失敗: {sheet_error}")

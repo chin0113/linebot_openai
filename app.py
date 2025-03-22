@@ -28,7 +28,7 @@ from google.auth.exceptions import RefreshError
 '''
 # Line 群發注意事項：
 
-# 第 226 行左右
+# 第 260 行左右
 # 注意！要先定義班級 std_class 和作文主題 title
 # 注意！要先定義班級 std_class 和作文主題 title
 # 注意！要先定義班級 std_class 和作文主題 title
@@ -37,7 +37,7 @@ from google.auth.exceptions import RefreshError
 # 注意！圖檔要上傳到網站
 # 注意！圖檔要上傳到網站
 
-# 第 53 行左右
+# 第 55 行左右
 # MAIL_SPREADSHEET_ID 需先用測試
 # MAIL_SPREADSHEET_ID 需先用測試
 # MAIL_SPREADSHEET_ID 需先用測試
@@ -173,12 +173,24 @@ def upload_image_to_drive(image_data, file_name):
     except Exception as e:
         print(f"圖片上傳失敗: {e}")
         return None
-
+'''
 def is_new_user(user_id):
     """檢查 user_id 是否存在於 Google Sheets"""
     records = safe_get_records(line_id_sheet)  # 改用 safe_get_records()
     return not any(record.get("id") == user_id for record in records)
 # 定義自動重試機制
+'''
+def is_new_user(user_id):
+    """從第 1 欄抓取所有 userId，效能高且不易 timeout"""
+    for attempt in range(3):
+        try:
+            id_list = line_id_sheet.col_values(1)  # 假設 id 欄在第 1 欄
+            return user_id not in id_list
+        except Exception as e:
+            print(f"檢查是否為新使用者失敗，第 {attempt+1} 次重試: {e}")
+            time.sleep(2 ** attempt)  # Exponential backoff
+    print("多次嘗試後仍無法存取 Google Sheets")
+    return False  # 為保險起見，失敗時視為舊使用者，避免 crash
 
 def get_user_name(user_id):
     """從 LINE_ID_SPREADSHEET_ID 取得 user_name"""

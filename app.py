@@ -191,13 +191,27 @@ def is_new_user(user_id):
             time.sleep(2 ** attempt)  # Exponential backoff
     print("多次嘗試後仍無法存取 Google Sheets")
     return False  # 為保險起見，失敗時視為舊使用者，避免 crash
-
+'''
 def get_user_name(user_id):
     """從 LINE_ID_SPREADSHEET_ID 取得 user_name"""
     records = safe_get_records(line_id_sheet)  # 安全地讀取試算表
     for record in records:
         if record.get("id") == user_id:  # 確保 `id` 欄位匹配
             return record.get("name", "Unknown")  # 預設為 "Unknown" 以防沒有名稱
+    return "Unknown"
+'''
+def get_user_name(user_id):
+    """從 Google Sheets 中根據 user_id 取得對應的名稱，效能優化版"""
+    for attempt in range(3):
+        try:
+            all_values = line_id_sheet.get_all_values()  # 不轉 dict，比 get_all_records 快
+            for row in all_values:
+                if len(row) >= 2 and row[0] == user_id:  # 確保有足夠欄位
+                    return row[3]  # 假設第 2 欄是 name
+            return "Unknown"
+        except Exception as e:
+            print(f"取得 user name 失敗，第 {attempt+1} 次重試: {e}")
+            time.sleep(2 ** attempt)
     return "Unknown"
 
 def retry_function(func, retries=3, delay=2):

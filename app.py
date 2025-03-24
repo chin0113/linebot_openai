@@ -297,8 +297,8 @@ def send_messages():
                 encoded_class = urllib.parse.quote(std_class)
                 encoded_title = urllib.parse.quote(title)
 
-                image_url = f"https://hsinhua.net/composition/{encoded_class}/{encoded_title}/orig/{encoded_name}.jpg"
-                image_url_pre = f"https://hsinhua.net/composition/{encoded_class}/{encoded_title}/pre/{encoded_name}.jpg"
+                image_url = f"https://bizbear.cc/composition/{encoded_class}/{encoded_title}/orig/{encoded_name}.jpg"
+                image_url_pre = f"https://bizbear.cc/composition/{encoded_class}/{encoded_title}/pre/{encoded_name}.jpg"
                 image_message = ImageSendMessage(
                     original_content_url=image_url,
                     preview_image_url=image_url_pre

@@ -415,5 +415,37 @@ def linebot():
     
     return retry_function(process_request)
 
+@app.route("/lecture", methods=["GET"])
+def send_lecture_links():
+    try:
+        # 開啟目標試算表
+        lecture_sheet = gc.open_by_key("14TwhcFFfW3B4323jWcdAIaOoGey6Qk8p2pdw0j0-UwE").sheet1
+        rows = lecture_sheet.get_all_values()
+
+        for row in rows:
+            if len(row) >= 8:
+                user_id = row[0].strip()
+                class_info = row[1].strip()
+                code = row[7].strip()
+
+                if "線上" in class_info and user_id and code:
+                    message = TextSendMessage(
+                        text=(
+                            "【請填寫講義領取方式】\n"
+                            "親愛的家長，您好！請進入以下網站來填寫講義領取方式，確認無誤後，請按「確認送出」，謝謝您！\n"
+                            f"https://bizbear.cc/address-form.php?code={code}"
+                        )
+                    )
+                    try:
+                        line_bot_api.push_message(user_id, message)
+                        print(f"已發送訊息給 {user_id}")
+                    except Exception as e:
+                        print(f"發送訊息給 {user_id} 失敗: {e}")
+
+        return "Lecture links sent!", 200
+    except Exception as e:
+        print(f"/lecture 發生錯誤: {e}")
+        return "Error", 500
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)

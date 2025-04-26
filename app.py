@@ -281,9 +281,20 @@ def send_messages():
         records = mail_sheet.get_all_records()
 
         for row in records:
+            # 新增：檢查班級是不是「線中三」
+            class_name = str(row.get('class', '')).strip()
+            if class_name != std_class:
+                continue  # 如果不是「線中三」，跳過這筆
+
+            # 判斷是否需要傳送文字或圖片
             send_image = str(row.get('hw', '')).strip().lower() == 'y'
             send_text = str(row.get('txt', '')).strip().lower() == 'y'
 
+            # 如果 hw 和 txt 都不是 'y'，也跳過
+            if not (send_image or send_text):
+                continue
+
+            # 處理 ID 欄位
             id_field = str(row.get('id', '')).strip()
             if ',' in id_field:
                 user_ids = [uid.strip() for uid in id_field.split(',')]

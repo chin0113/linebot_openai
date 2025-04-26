@@ -272,7 +272,7 @@ def send_messages():
     try:
         # 固定的班級與作文標題
         std_class = "線中三"
-        title = "一趟豐富之旅"
+        title = "朋友"
 
         # 文字訊息
         text_message = TextSendMessage(text="【作文評語】\n親愛的家長，您好！附檔為芷瑢老師批閱後的作文評語（也有同步mail回信給孩子），還請孩子詳細看過並了解問題點，老師上課會進行總檢討，也同時讓家長掌握孩子的學習成果，謝謝您！")

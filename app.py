@@ -53,9 +53,9 @@ SHEET_CREDENTIALS_FILE = "newagent-gfvg-4f6c0497de66.json"
 MSG_SPREADSHEET_ID = "1p6K5yoQLMnAoS5eLRGEYUVcuI6pIzifmg7VunZHUWR0"
 LINE_ID_SPREADSHEET_ID = "1uuIEQdD_maLJFG3Qj-gIPWw0w5Ph0leRyrOed_LNmOM"
 #正式
-MAIL_SPREADSHEET_ID = "1w5brdzpIELPZaKa8C_QGcRK1byZLXXQwBz1FM0rsqVA"
+#MAIL_SPREADSHEET_ID = "1w5brdzpIELPZaKa8C_QGcRK1byZLXXQwBz1FM0rsqVA"
 #測試
-#MAIL_SPREADSHEET_ID = "13E14q3yzwgnc__vD2hZKYduIwHxGDQabU_VyrtSR8i4"
+MAIL_SPREADSHEET_ID = "13E14q3yzwgnc__vD2hZKYduIwHxGDQabU_VyrtSR8i4"
 
 # 從環境變數讀取憑證內容
 credentials_base64 = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
@@ -271,8 +271,8 @@ def health_check():
 def send_messages():
     try:
         # 固定的班級與作文標題
-        std_class = "線高三"
-        title = "未成功的物品展覽會"
+        std_class = "線中六"
+        title = "朋友"
 
         # 文字訊息
         text_message = TextSendMessage(text="【作文評語】\n親愛的家長，您好！附檔為芷瑢老師批閱後的作文評語（也有同步mail回信給孩子），還請孩子詳細看過並了解問題點，老師上課會進行總檢討，也同時讓家長掌握孩子的學習成果，謝謝您！")

@@ -267,12 +267,19 @@ def keep_alive():
 def health_check():
     return "OK", 200
     
-@app.route("/send", methods=["GET"])
+from flask import request
+
+@app.route("/send", methods=["POST"])
 def send_messages():
     try:
-        # 固定的班級與作文標題
-        std_class = "線中六"
-        title = "朋友"
+        data = request.get_json()
+        std_class = data.get("std_class", "").strip()
+        title = data.get("title", "").strip()
+
+        if not std_class or not title:
+            return jsonify({"error": "std_class 和 title 都必須提供"}), 400
+
+        print(f"\n即將傳送給班級：{std_class}，主題：{title}")
 
         # 文字訊息
         text_message = TextSendMessage(text="【作文評語】\n親愛的家長，您好！附檔為芷瑢老師批閱後的作文評語（也有同步mail回信給孩子），還請孩子詳細看過並了解問題點，老師上課會進行總檢討，也同時讓家長掌握孩子的學習成果，謝謝您！")
@@ -281,20 +288,18 @@ def send_messages():
         records = mail_sheet.get_all_records()
 
         for row in records:
-            # 新增：檢查班級是不是「線中三」
+            # 檢查班級是不是符合使用者傳來的
             class_name = str(row.get('class', '')).strip()
             if class_name != std_class:
-                continue  # 如果不是「線中三」，跳過這筆
+                continue
 
             # 判斷是否需要傳送文字或圖片
             send_image = str(row.get('hw', '')).strip().lower() == 'y'
             send_text = str(row.get('txt', '')).strip().lower() == 'y'
 
-            # 如果 hw 和 txt 都不是 'y'，也跳過
             if not (send_image or send_text):
                 continue
 
-            # 處理 ID 欄位
             id_field = str(row.get('id', '')).strip()
             if ',' in id_field:
                 user_ids = [uid.strip() for uid in id_field.split(',')]
@@ -330,10 +335,11 @@ def send_messages():
                             except Exception as e:
                                 print(f"發送訊息給 {user_id} 失敗: {e}")
 
-        return "Messages sent successfully!", 200
+        return jsonify({"message": "Messages sent successfully!"}), 200
     except Exception as e:
         print(f"發生錯誤: {e}")
-        return "Error", 500
+        return jsonify({"error": str(e)}), 500
+
         
 @app.route("/", methods=["POST"])
 def linebot():

@@ -328,7 +328,7 @@ def send_messages():
                         response = requests.head(image_url, timeout=3)
                         if response.status_code != 200:
                             print(f"圖片不存在或錯誤：{image_url}")
-                            return  # 終止這次廣播
+                            return "圖片不存在，訊息未發送", 400
                     except Exception as e:
                         print(f"無法連線到圖片 {image_url}：{e}")
                         return  # 終止這次廣播

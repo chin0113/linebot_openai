@@ -17,6 +17,7 @@ import time
 import yagmail
 from google.auth.exceptions import TransportError
 import time
+import requests
 
 '''
 import smtplib
@@ -324,7 +325,7 @@ def send_messages():
                     try:
                         response = requests.head(image_url, timeout=3)
                         if response.status_code != 200:
-                            image_exists = True
+                            image_exists = False
                     except Exception as e:
                         print(f"無法連線到圖片 {image_url}：{e}")
                         image_exists = False

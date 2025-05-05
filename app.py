@@ -317,18 +317,31 @@ def send_messages():
 
                 image_url = f"https://bizbear.cc/composition/{encoded_class}/{encoded_title}/orig/{encoded_name}.jpg"
                 image_url_pre = f"https://bizbear.cc/composition/{encoded_class}/{encoded_title}/pre/{encoded_name}.jpg"
-                image_message = ImageSendMessage(
-                    original_content_url=image_url,
-                    preview_image_url=image_url_pre
-                )
+
+                # 檢查圖片是否存在
+                image_exists = True
+                if send_image:
+                    try:
+                        response = requests.head(image_url, timeout=3)
+                        if response.status_code != 200:
+                            image_exists = False
+                    except Exception as e:
+                        print(f"無法連線到圖片 {image_url}：{e}")
+                        image_exists = False
 
                 for user_id in user_ids:
                     user_id = user_id.strip()
                     if user_id:
                         messages = []
-                        if send_text:
+
+                        if send_text and (not send_image or image_exists):
                             messages.append(text_message)
-                        if send_image:
+
+                        if send_image and image_exists:
+                            image_message = ImageSendMessage(
+                                original_content_url=image_url,
+                                preview_image_url=image_url_pre
+                            )
                             messages.append(image_message)
 
                         if messages:

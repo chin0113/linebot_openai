@@ -311,6 +311,9 @@ def send_messages():
 
             name = str(row.get('name', '')).strip()
 
+            image_checked = False
+            image_exists = True  # 預設為 True，避免漏設造成發送
+
             if user_ids and name:
                 encoded_name = urllib.parse.quote(name)
                 encoded_class = urllib.parse.quote(std_class)
@@ -319,30 +322,32 @@ def send_messages():
                 image_url = f"https://bizbear.cc/composition/{encoded_class}/{encoded_title}/orig/{encoded_name}.jpg"
                 image_url_pre = f"https://bizbear.cc/composition/{encoded_class}/{encoded_title}/pre/{encoded_name}.jpg"
 
-                # 檢查圖片是否存在
-                image_exists = True
-                if send_image:
+                # 第一次需要檢查圖片連結是否存在
+                if send_image and not image_checked:
                     try:
                         response = requests.head(image_url, timeout=3)
                         if response.status_code != 200:
-                            image_exists = False
+                            print(f"圖片不存在或錯誤：{image_url}")
+                            return  # 終止這次廣播
                     except Exception as e:
                         print(f"無法連線到圖片 {image_url}：{e}")
-                        image_exists = False
+                        return  # 終止這次廣播
+                    image_checked = True  # 只檢查一次
+
+                # 建立圖片訊息（已確認圖片存在）
+                if send_image:
+                    image_message = ImageSendMessage(
+                        original_content_url=image_url,
+                        preview_image_url=image_url_pre
+                    )
 
                 for user_id in user_ids:
                     user_id = user_id.strip()
                     if user_id:
                         messages = []
-
-                        if send_text and (not send_image or image_exists):
+                        if send_text:
                             messages.append(text_message)
-
-                        if send_image and image_exists:
-                            image_message = ImageSendMessage(
-                                original_content_url=image_url,
-                                preview_image_url=image_url_pre
-                            )
+                        if send_image:
                             messages.append(image_message)
 
                         if messages:

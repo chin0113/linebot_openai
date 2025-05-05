@@ -324,15 +324,21 @@ def send_messages():
 
                 # 第一次需要檢查圖片連結是否存在
                 if send_image and not image_checked:
-                    try:
-                        response = requests.head(image_url, timeout=3)
-                        if response.status_code != 200:
-                            print(f"圖片不存在或錯誤：{image_url}")
+                    for i in range(2):  # 最多嘗試 2 次
+                        try:
+                            response = requests.head(image_url, timeout=3)
+                            if response.status_code == 200:
+                                break  # 圖片存在，跳出 retry
+                            else:
+                                print(f"圖片不存在或錯誤（狀態碼 {response.status_code}）：{image_url}")
+                        except Exception as e:
+                            print(f"第 {i+1} 次連線失敗：{e}")
+        
+                        if i == 1:
                             return "圖片不存在，訊息未發送", 400
-                    except Exception as e:
-                        print(f"無法連線到圖片 {image_url}：{e}")
-                        return  # 終止這次廣播
-                    image_checked = True  # 只檢查一次
+                        time.sleep(1)  # 下次嘗試前等 1 秒
+
+                    image_checked = True
 
                 # 建立圖片訊息（已確認圖片存在）
                 if send_image:

@@ -384,8 +384,25 @@ def notify_messages():
         image_names = [name.strip() for name in image_names_raw.split(',') if name.strip()] if send_image else []
         text_message = TextSendMessage(text=message_text) if send_text else None
 
-        records = mail_sheet.get_all_records()
+        # ✅ 圖片存在性檢查（統一一次性驗證）
+        if send_image:
+            for img_name in image_names:
+                encoded_img_name = urllib.parse.quote(img_name)
+                image_url = f"https://bizbear.cc/composition/notify/orig/{encoded_img_name}"
+                for i in range(2):
+                    try:
+                        response = requests.head(image_url, timeout=3)
+                        if response.status_code == 200:
+                            break
+                    except Exception as e:
+                        print(f"檢查圖片失敗 {i+1} 次：{e}")
+                    if i == 1:
+                        print(f"❌ 終止：圖片不存在 - {image_url}")
+                        return jsonify({"error": f"圖片不存在：{img_name}"}), 400
+                    time.sleep(1)
 
+        # ✅ 確保圖片都存在後，才發送訊息
+        records = mail_sheet.get_all_records()
         for row in records:
             if str(row.get('hw', '')).strip().lower() != 'y':
                 continue
@@ -396,29 +413,12 @@ def notify_messages():
             else:
                 user_ids = [id_field] if id_field else []
 
-            name = str(row.get('name', '')).strip()
-            if not name:
-                continue
-
             image_messages = []
             if send_image:
                 for img_name in image_names:
                     encoded_img_name = urllib.parse.quote(img_name)
                     image_url = f"https://bizbear.cc/composition/notify/orig/{encoded_img_name}"
                     image_url_pre = f"https://bizbear.cc/composition/notify/pre/{encoded_img_name}"
-
-                    for i in range(2):
-                        try:
-                            response = requests.head(image_url, timeout=3)
-                            if response.status_code == 200:
-                                break
-                        except Exception as e:
-                            print(f"圖片檢查失敗 {i+1} 次：{e}")
-                        if i == 1:
-                            print(f"❌ 圖片 {img_name} 不存在：{image_url}")
-                            continue
-                        time.sleep(1)
-
                     image_messages.append(ImageSendMessage(
                         original_content_url=image_url,
                         preview_image_url=image_url_pre

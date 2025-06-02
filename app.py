@@ -375,14 +375,15 @@ def notify_messages():
         message_text = data.get("message_text", "").strip()
         order = data.get("order", "text-first")
 
-        if not image_names_raw or not message_text:
-            return jsonify({"error": "image_names 和 message_text 都必須提供"}), 400
+        send_text = bool(message_text)
+        send_image = bool(image_names_raw)
 
-        image_names = [name.strip() for name in image_names_raw.split(',') if name.strip()]
-        if not image_names:
-            return jsonify({"error": "圖片名稱格式錯誤"}), 400
+        if not send_text and not send_image:
+            return jsonify({"error": "請至少提供圖片名稱或文字訊息"}), 400
 
-        text_message = TextSendMessage(text=message_text)
+        image_names = [name.strip() for name in image_names_raw.split(',') if name.strip()] if send_image else []
+        text_message = TextSendMessage(text=message_text) if send_text else None
+
         records = mail_sheet.get_all_records()
 
         for row in records:
@@ -399,47 +400,46 @@ def notify_messages():
             if not name:
                 continue
 
-            encoded_name = urllib.parse.quote(name)
-
             image_messages = []
-            for img_name in image_names:
-                encoded_img_name = urllib.parse.quote(img_name)
-                image_url = f"https://bizbear.cc/composition/notify/orig/{encoded_img_name}"
-                image_url_pre = f"https://bizbear.cc/composition/notify/pre/{encoded_img_name}"
+            if send_image:
+                for img_name in image_names:
+                    encoded_img_name = urllib.parse.quote(img_name)
+                    image_url = f"https://bizbear.cc/composition/notify/orig/{encoded_img_name}"
+                    image_url_pre = f"https://bizbear.cc/composition/notify/pre/{encoded_img_name}"
 
-                # 重試機制
-                for i in range(2):
-                    try:
-                        response = requests.head(image_url, timeout=3)
-                        if response.status_code == 200:
-                            break
-                    except Exception as e:
-                        print(f"圖片檢查失敗 {i+1} 次：{e}")
-                    if i == 1:
-                        print(f"❌ 圖片 {img_name} 不存在：{image_url}")
-                        continue
-                    time.sleep(1)
+                    for i in range(2):
+                        try:
+                            response = requests.head(image_url, timeout=3)
+                            if response.status_code == 200:
+                                break
+                        except Exception as e:
+                            print(f"圖片檢查失敗 {i+1} 次：{e}")
+                        if i == 1:
+                            print(f"❌ 圖片 {img_name} 不存在：{image_url}")
+                            continue
+                        time.sleep(1)
 
-                image_messages.append(ImageSendMessage(
-                    original_content_url=image_url,
-                    preview_image_url=image_url_pre
-                ))
+                    image_messages.append(ImageSendMessage(
+                        original_content_url=image_url,
+                        preview_image_url=image_url_pre
+                    ))
 
             for user_id in user_ids:
                 user_id = user_id.strip()
                 if user_id:
                     messages = []
                     if order == "text-first":
-                        messages.append(text_message)
+                        if send_text: messages.append(text_message)
                         messages.extend(image_messages)
                     else:
                         messages.extend(image_messages)
-                        messages.append(text_message)
+                        if send_text: messages.append(text_message)
 
-                    try:
-                        line_bot_api.push_message(user_id, messages)
-                    except Exception as e:
-                        print(f"發送給 {user_id} 失敗：{e}")
+                    if messages:
+                        try:
+                            line_bot_api.push_message(user_id, messages)
+                        except Exception as e:
+                            print(f"發送給 {user_id} 失敗：{e}")
 
         return jsonify({"message": "Notify messages sent!"}), 200
 

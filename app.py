@@ -381,7 +381,9 @@ def notify_messages():
         if not send_text and not send_image:
             return jsonify({"error": "請至少提供圖片名稱或文字訊息"}), 400
 
-        image_names = [name.strip() for name in image_names_raw.split(',') if name.strip()] if send_image else []
+        #image_names = [name.strip() for name in image_names_raw.split(',') if name.strip()] if send_image else []
+        image_names = [urllib.parse.unquote(name.strip()) for name in image_names_raw.split(',') if name.strip()] if send_image else []
+
         text_message = TextSendMessage(text=message_text) if send_text else None
 
         # ✅ 圖片存在性檢查（統一一次性驗證）

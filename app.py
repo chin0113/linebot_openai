@@ -548,24 +548,26 @@ def send_lecture_links():
         rows = lecture_sheet.get_all_values()
 
         for row in rows:
-            if len(row) >= 8:
+            if len(row) >= 9:
                 user_id = row[0].strip()
                 class_info = row[1].strip()
                 code = row[7].strip()
+                send_flag = row[8].strip().lower()  # 第 9 欄是 send
 
-                if "線上" in class_info and user_id and code:
+                if "線上" in class_info and user_id and code and send_flag == "y":
                     message = TextSendMessage(
                         text=(
-                            "【請填寫講義領取方式】\n"
-                            "親愛的家長，您好！請進入以下網站來填寫講義領取方式，確認無誤後，請按「確認送出」，謝謝您！\n"
-                            f"https://bizbear.cc/address-form.php?code={code}"
+                            "【請提供講義收件地址】\n"
+                            "親愛的家長，您好！為郵寄秋冬班線上課程講義，我們將以「掛號」形式寄出（預計8月21日(四)寄出），收件者為學生姓名，麻煩點選以下連結填寫地址。\n\n"
+                            f"https://bizbear.cc/address-form.php?code={code}\n\n"
+                            "由於近期人員重新配置，僅提供一個自取時段（請見連結），造成不便，敬請您的體諒。～行政組～"
                         )
                     )
                     try:
                         line_bot_api.push_message(user_id, message)
-                        print(f"已發送訊息給 {user_id}")
+                        print(f"✅ 已發送訊息給 {user_id}")
                     except Exception as e:
-                        print(f"發送訊息給 {user_id} 失敗: {e}")
+                        print(f"❌ 發送訊息給 {user_id} 失敗: {e}")
 
         return "Lecture links sent!", 200
     except Exception as e:

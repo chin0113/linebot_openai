@@ -372,7 +372,8 @@ def notify_messages():
     try:
         data = request.get_json()
         image_names_raw = data.get("image_names", "").strip()
-        message_text = data.get("message_text", "").strip()
+        #message_text = data.get("message_text", "").strip()
+        message_texts = [t.strip() for t in data.get("message_texts", []) if t.strip()]
         order = data.get("order", "text-first")
 
         send_text = bool(message_text)
@@ -384,7 +385,8 @@ def notify_messages():
         #image_names = [name.strip() for name in image_names_raw.split(',') if name.strip()] if send_image else []
         image_names = [urllib.parse.unquote(name.strip()) for name in image_names_raw.split(',') if name.strip()] if send_image else []
 
-        text_message = TextSendMessage(text=message_text) if send_text else None
+        #text_message = TextSendMessage(text=message_text) if send_text else None
+        text_messages = [TextSendMessage(text=t) for t in message_texts]
 
         # ✅ 圖片存在性檢查（統一一次性驗證）
         if send_image:

@@ -376,7 +376,7 @@ def notify_messages():
         message_texts = [t.strip() for t in data.get("message_texts", []) if t.strip()]
         order = data.get("order", "text-first")
 
-        send_text = bool(message_text)
+        send_text = bool(message_texts)
         send_image = bool(image_names_raw)
 
         if not send_text and not send_image:

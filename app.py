@@ -433,11 +433,11 @@ def notify_messages():
                 if user_id:
                     messages = []
                     if order == "text-first":
-                        if send_text: messages.append(text_message)
+                        messages.extend(text_messages)     # 多段文字
                         messages.extend(image_messages)
                     else:
                         messages.extend(image_messages)
-                        if send_text: messages.append(text_message)
+                        messages.extend(text_messages)     # 多段文字
 
                     if messages:
                         try:

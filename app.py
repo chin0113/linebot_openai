@@ -184,12 +184,19 @@ def upload_file_to_drive(file_bytes, file_name, mimetype='application/octet-stre
     file_name: 檔名（含副檔名）
     mimetype: 例如 'application/pdf'
     """
-    file_metadata = {'name': file_name, 'parents': [FOLDER_ID]}
-    media = MediaIoBaseUpload(file_bytes, mimetype=mimetype, resumable=True)
-    file = drive_service.files().create(
-        body=file_metadata, media_body=media, fields='id'
-    ).execute()
-    return file.get('id')
+    try:
+        service = get_drive_service()            # 這裡改用同一個取 service 的方法
+        file_metadata = {'name': file_name, 'parents': [FOLDER_ID]}
+        if hasattr(file_bytes, "seek"):
+            file_bytes.seek(0)
+        media = MediaIoBaseUpload(file_bytes, mimetype=mimetype)
+        uploaded = service.files().create(
+            body=file_metadata, media_body=media, fields='id'
+        ).execute()
+        return uploaded.get('id')
+    except Exception as e:
+        print(f"檔案上傳失敗: {e}")
+        return None
 '''
 def is_new_user(user_id):
     """檢查 user_id 是否存在於 Google Sheets"""

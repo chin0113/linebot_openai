@@ -176,6 +176,20 @@ def upload_image_to_drive(image_data, file_name):
     except Exception as e:
         print(f"圖片上傳失敗: {e}")
         return None
+        
+def upload_file_to_drive(file_bytes, file_name, mimetype='application/octet-stream'):
+    """
+    將任意檔案上傳到與圖片相同的資料夾（FOLDER_ID）。
+    file_bytes: BytesIO
+    file_name: 檔名（含副檔名）
+    mimetype: 例如 'application/pdf'
+    """
+    file_metadata = {'name': file_name, 'parents': [FOLDER_ID]}
+    media = MediaIoBaseUpload(file_bytes, mimetype=mimetype, resumable=True)
+    file = drive_service.files().create(
+        body=file_metadata, media_body=media, fields='id'
+    ).execute()
+    return file.get('id')
 '''
 def is_new_user(user_id):
     """檢查 user_id 是否存在於 Google Sheets"""
@@ -532,6 +546,36 @@ def linebot():
                         except Exception as sheet_error:
                             print(f"寫入 Google Sheet 失敗: {sheet_error}")
 
+                     # 處理 PDF（LINE 會以 type="file" 傳送）
+                     elif message_type == "file":
+                         file_name = event["message"].get("fileName", "")
+                         file_size = event["message"].get("fileSize", 0)
+
+                         # 只處理 PDF
+                         if file_name and file_name.lower().endswith(".pdf"):
+                             print(f"收到 PDF 檔案: {file_name} (size: {file_size})")
+
+                             # 記錄到 Google Sheet
+                             try:
+                                 safe_append_row(sheet, [taiwan_time, user_id, user_name, f"pdf: {file_name}", new_user_flag])
+                                 print("PDF 訊息成功寫入 Google Sheet")
+                             except Exception as sheet_error:
+                                 print(f"寫入 Google Sheet 失敗: {sheet_error}")
+
+                             # 下載檔案內容
+                             message_content = line_bot_api.get_message_content(message_id)
+                             pdf_bytes = io.BytesIO(message_content.content)
+
+                             # 依照你圖片的命名規則，帶上班級與學生名稱（若有）
+                             class_name, std_name = get_class_std_from_user_id(user_id)
+                             save_name = f"{class_name}_{std_name}_{file_name}" if class_name and std_name else file_name
+
+                             # 上傳到與圖片相同的資料夾
+                             uploaded_pdf_id = upload_file_to_drive(pdf_bytes, save_name, mimetype='application/pdf')
+                             if uploaded_pdf_id:
+                                 print(f"PDF 已上傳到 Google Drive: {uploaded_pdf_id}")
+                             else:
+                                 print("PDF 上傳失敗")
                 return "OK"
             else:
                 print("沒有事件需要處理")

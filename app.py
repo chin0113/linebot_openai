@@ -18,6 +18,22 @@ import yagmail
 from google.auth.exceptions import TransportError
 import time
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+# 建一個有重試的 Session（全域共用）
+session = requests.Session()
+retry = Retry(
+    total=3,
+    connect=3,
+    read=3,
+    backoff_factor=0.5,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["GET", "HEAD"]
+)
+adapter = HTTPAdapter(max_retries=retry)
+session.mount("https://", adapter)
+session.mount("http://", adapter)
 
 '''
 import smtplib
@@ -282,6 +298,20 @@ def safe_append_row(sheet, row, retries=5):
         time.sleep(2**attempt)  # 2 的指數次回退
     print("寫入 Google Sheets 失敗，請確認 API 設定或網路狀況")
     return False  # 最終還是失敗
+
+def check_image_exists(url: str, timeout=(3.05, 6.0)) -> bool:
+    """用 GET + Range 只抓 1 byte，提升相容性；回 200/206 視為存在"""
+    try:
+        resp = session.get(
+            url,
+            headers={"Range": "bytes=0-0"},
+            stream=True,
+            timeout=timeout,
+        )
+        return resp.status_code in (200, 206)
+    except requests.RequestException as e:
+        print(f"[image-check] failed: {e}")
+        return False
     
 @app.route("/", methods=["GET"])
 def keep_alive():
@@ -343,22 +373,11 @@ def send_messages():
                 image_url = f"https://bizbear.cc/composition/{encoded_class}/{encoded_title}/orig/{encoded_name}.jpg"
                 image_url_pre = f"https://bizbear.cc/composition/{encoded_class}/{encoded_title}/pre/{encoded_name}.jpg"
 
-                # 第一次需要檢查圖片連結是否存在
+                # 第一次需要檢查圖片連結是否存在（只檢一次）
                 if send_image and not image_checked:
-                    for i in range(2):  # 最多嘗試 2 次
-                        try:
-                            response = requests.head(image_url, timeout=3)
-                            if response.status_code == 200:
-                                break  # 圖片存在，跳出 retry
-                            else:
-                                print(f"圖片不存在或錯誤（狀態碼 {response.status_code}）：{image_url}")
-                        except Exception as e:
-                            print(f"第 {i+1} 次連線失敗：{e}")
-        
-                        if i == 1:
-                            return "圖片不存在，訊息未發送", 400
-                        time.sleep(1)  # 下次嘗試前等 1 秒
-
+                    ok = check_image_exists(image_url, timeout=(3.05, 6.0))
+                    if not ok:
+                        return jsonify({"error": "圖片不存在或連線逾時，已取消這次廣播"}), 400
                     image_checked = True
 
                 # 建立圖片訊息（已確認圖片存在）
@@ -380,6 +399,7 @@ def send_messages():
                         if messages:
                             try:
                                 line_bot_api.push_message(user_id, messages)
+                                time.sleep(0.1)  # 可視負載調整 0.05~0.2
                             except Exception as e:
                                 print(f"發送訊息給 {user_id} 失敗: {e}")
 

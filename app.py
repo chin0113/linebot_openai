@@ -299,19 +299,36 @@ def safe_append_row(sheet, row, retries=5):
     print("寫入 Google Sheets 失敗，請確認 API 設定或網路狀況")
     return False  # 最終還是失敗
 
-def check_image_exists(url: str, timeout=(3.05, 6.0)) -> bool:
-    """用 GET + Range 只抓 1 byte，提升相容性；回 200/206 視為存在"""
+def check_image_exists(url: str) -> bool:
+    """
+    穩健版圖片存在檢查：
+    1) 先 HEAD（快），允許 redirect；接受 200/301/302。
+    2) 再用 Range: bytes=0-0 的極小 GET（相容性高）；接受 200/206。
+    超時策略：HEAD 稍短、GET 稍長，降低偽陰性。
+    """
+    # 優先用 HEAD，減少下載等待
     try:
-        resp = session.get(
+        r = session.head(url, allow_redirects=True, timeout=(1.2, 1.8))
+        if r.status_code in (200, 301, 302):
+            return True
+    except requests.RequestException as e:
+        print(f"[image-check HEAD] {url} -> {e}")
+
+    # 若 HEAD 不可靠/不支援，退回極小範圍 GET
+    try:
+        r = session.get(
             url,
             headers={"Range": "bytes=0-0"},
             stream=True,
-            timeout=timeout,
+            allow_redirects=True,
+            timeout=(1.5, 2.5),
         )
-        return resp.status_code in (200, 206)
+        if r.status_code in (200, 206):
+            return True
     except requests.RequestException as e:
-        print(f"[image-check] failed: {e}")
-        return False
+        print(f"[image-check GET-range] {url} -> {e}")
+
+    return False
     
 @app.route("/", methods=["GET"])
 def keep_alive():
@@ -335,75 +352,74 @@ def send_messages():
 
         print(f"\n即將傳送給班級：{std_class}，主題：{title}")
 
-        # 文字訊息
-        text_message = TextSendMessage(text="【作文評語】\n親愛的家長，您好！附檔為芷瑢老師批閱後的作文評語（也有同步mail回信給孩子），還請孩子詳細看過並了解問題點，老師上課會進行總檢討，也同時讓家長掌握孩子的學習成果，謝謝您！")
+        text_message = TextSendMessage(
+            text="【作文評語】\n親愛的家長，您好！附檔為芷瑢老師批閱後的作文評語（也有同步mail回信給孩子），還請孩子詳細看過並了解問題點，老師上課會進行總檢討，也同時讓家長掌握孩子的學習成果，謝謝您！"
+        )
 
-        # 讀取 Google Sheets 資料
         records = mail_sheet.get_all_records()
 
         for row in records:
-            # 檢查班級是不是符合使用者傳來的
             class_name = str(row.get('class', '')).strip()
             if class_name != std_class:
                 continue
 
-            # 判斷是否需要傳送文字或圖片
             send_image = str(row.get('hw', '')).strip().lower() == 'y'
-            send_text = str(row.get('txt', '')).strip().lower() == 'y'
-
+            send_text  = str(row.get('txt', '')).strip().lower() == 'y'
             if not (send_image or send_text):
                 continue
 
             id_field = str(row.get('id', '')).strip()
-            if ',' in id_field:
-                user_ids = [uid.strip() for uid in id_field.split(',')]
-            else:
-                user_ids = [id_field] if id_field else []
-
+            user_ids = [uid.strip() for uid in id_field.split(',')] if ',' in id_field else ([id_field] if id_field else [])
             name = str(row.get('name', '')).strip()
+            if not (user_ids and name):
+                continue
 
-            image_checked = False
-            image_exists = True  # 預設為 True，避免漏設造成發送
+            enc_name  = urllib.parse.quote(name)
+            enc_class = urllib.parse.quote(std_class)
+            enc_title = urllib.parse.quote(title)
 
-            if user_ids and name:
-                encoded_name = urllib.parse.quote(name)
-                encoded_class = urllib.parse.quote(std_class)
-                encoded_title = urllib.parse.quote(title)
+            image_url     = f"https://bizbear.cc/composition/{enc_class}/{enc_title}/orig/{enc_name}.jpg"
+            image_url_pre = f"https://bizbear.cc/composition/{enc_class}/{enc_title}/pre/{enc_name}.jpg"
 
-                image_url = f"https://bizbear.cc/composition/{encoded_class}/{encoded_title}/orig/{encoded_name}.jpg"
-                image_url_pre = f"https://bizbear.cc/composition/{encoded_class}/{encoded_title}/pre/{encoded_name}.jpg"
+            # ---- 關鍵：若「需要圖片」，圖片不可用 → 直接略過此學生（文字也不送） ----
+            if send_image:
+                image_ok = check_image_exists(image_url)
+                if not image_ok:
+                    print(f"[skip student] 圖片不可用 → 略過 {name}（文字與圖片皆不送）: {image_url}")
+                    continue
 
-                # 第一次需要檢查圖片連結是否存在（只檢一次）
-                if send_image and not image_checked:
-                    ok = check_image_exists(image_url, timeout=(3.05, 6.0))
-                    if not ok:
-                        return jsonify({"error": "圖片不存在或連線逾時，已取消這次廣播"}), 400
-                    image_checked = True
+            # 構造訊息（若 send_image==True，到這裡一定 image_ok==True）
+            image_message = None
+            if send_image:
+                image_message = ImageSendMessage(
+                    original_content_url=image_url,
+                    preview_image_url=image_url_pre
+                )
 
-                # 建立圖片訊息（已確認圖片存在）
+            for user_id in user_ids:
+                if not user_id:
+                    continue
+                messages = []
+                # 若不需要圖片、但要文字 → 只送文字
+                if send_text and (not send_image):
+                    messages.append(text_message)
+                # 若需要圖片（且已確認可用）→ 根據 send_text/sen_image 組裝
                 if send_image:
-                    image_message = ImageSendMessage(
-                        original_content_url=image_url,
-                        preview_image_url=image_url_pre
-                    )
+                    if send_text:
+                        messages.append(text_message)
+                    messages.append(image_message)
 
-                for user_id in user_ids:
-                    user_id = user_id.strip()
-                    if user_id:
-                        messages = []
-                        if send_text:
-                            messages.append(text_message)
-                        if send_image:
-                            messages.append(image_message)
+                if not messages:
+                    continue
 
-                        if messages:
-                            try:
-                                line_bot_api.push_message(user_id, messages)
-                                time.sleep(0.1)  # 可視負載調整 0.05~0.2
-                            except Exception as e:
-                                print(f"發送訊息給 {user_id} 失敗: {e}")
+                try:
+                    line_bot_api.push_message(user_id, messages)
+                    time.sleep(0.05)  # 略降等待，減少整體阻塞時間
+                except Exception as e:
+                    print(f"發送訊息給 {user_id} 失敗: {e}")
 
         return jsonify({"message": "Messages sent successfully!"}), 200
+
     except Exception as e:
         print(f"發生錯誤: {e}")
         return jsonify({"error": str(e)}), 500

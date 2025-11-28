@@ -570,7 +570,7 @@ def linebot():
                         uploaded_file_id = upload_image_to_drive(image_data, file_name)
                         if uploaded_file_id:
                             print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
-                            send_email(file_name)
+                            # send_email(file_name)
                         else:
                             print("圖片上傳失敗")
 

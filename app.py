@@ -24,6 +24,167 @@ import socket
 socket.setdefaulttimeout(20)  # 20 秒還拿不到回應就丟 timeout
 import uuid
 
+from queue import Queue
+import threading
+import tempfile
+
+EVENT_Q = Queue(maxsize=1000)
+SHEET_LOCK = threading.Lock()
+
+# 記錄最近處理過的事件，避免 LINE redelivery 重複寫
+# (用 dict + 時間戳，避免額外套件)
+PROCESSED = {}
+PROCESSED_TTL_SEC = 3600  # 1 小時
+
+def _gc_processed(now_ts: float):
+    # 簡單清理過期 key
+    expired = [k for k, t in PROCESSED.items() if now_ts - t > PROCESSED_TTL_SEC]
+    for k in expired:
+        PROCESSED.pop(k, None)
+
+def seen_event(key: str) -> bool:
+    now_ts = time.time()
+    _gc_processed(now_ts)
+    if not key:
+        return False
+    if key in PROCESSED:
+        return True
+    PROCESSED[key] = now_ts
+    return False
+
+def safe_append_rows(sheet, rows, retries=4):
+    """
+    用 append_rows 一次寫多筆，比 append_row 穩定、API 次數更少
+    """
+    for attempt in range(retries):
+        try:
+            with SHEET_LOCK:
+                sheet.append_rows(rows, value_input_option="RAW")
+            print(f"[sheet] appended {len(rows)} rows")
+            return True
+        except Exception as e:
+            print(f"[sheet] append_rows failed {attempt+1}/{retries}: {e}")
+            time.sleep(2 ** attempt)
+    return False
+
+def download_line_content_to_tempfile(message_id: str, suffix: str):
+    """
+    把 LINE 檔案/圖片用串流寫到 /tmp，避免一次把整張圖吃進記憶體。
+    回傳 (filepath, mimetype)
+    """
+    message_content = line_bot_api.get_message_content(message_id)
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="/tmp")
+    try:
+        # line-bot-sdk 的 content 物件通常支援 iter_content()
+        if hasattr(message_content, "iter_content"):
+            for chunk in message_content.iter_content():
+                if chunk:
+                    tmp.write(chunk)
+        else:
+            # fallback：真的沒有 iter_content 才用 .content
+            tmp.write(message_content.content)
+
+        tmp.flush()
+        return tmp.name
+    finally:
+        tmp.close()
+
+def event_worker():
+    while True:
+        request_id, event = EVENT_Q.get()
+        info = extract_event_info(event)
+        try:
+            log_event("event_worker_start", request_id, info)
+
+            # 用 webhookEventId 去重（最推薦），沒有就退回 message_id
+            dedup_key = info.get("webhookEventId") or info.get("message_id") or ""
+            if seen_event(dedup_key):
+                log_event("event_skipped_duplicate", request_id, info)
+                continue
+
+            user_id = event["source"]["userId"]
+            msg = event.get("message", {}) or {}
+            message_type = msg.get("type", "")
+            message_id = msg.get("id", "")
+
+            taiwan_time = now_tw_str()
+            new_user_flag = "new" if is_new_user(user_id) else ""
+            user_name = get_user_name(user_id)
+
+            # 先把「要寫入 sheet 的 row」準備好（先確保落地）
+            rows_to_write = []
+
+            if message_type == "text":
+                message_text = msg.get("text", "")
+                rows_to_write.append([taiwan_time, user_id, user_name, message_text, new_user_flag])
+                safe_append_rows(sheet, rows_to_write)
+
+            elif message_type == "image":
+                rows_to_write.append([taiwan_time, user_id, user_name, f"image id: {message_id}", new_user_flag])
+                safe_append_rows(sheet, rows_to_write)
+
+                # 再做重活：下載 + 上傳 Drive
+                class_name, std_name = get_class_std_from_user_id(user_id)
+                file_name = f"{class_name}_{std_name}_{message_id}.jpg" if class_name and std_name else f"{message_id}.jpg"
+
+                tmp_path = None
+                try:
+                    tmp_path = download_line_content_to_tempfile(message_id, suffix=".jpg")
+                    with open(tmp_path, "rb") as f:
+                        uploaded_file_id = upload_image_to_drive(f, file_name)
+                    if uploaded_file_id:
+                        log_event("drive_upload_ok", request_id, info, {"drive_file_id": uploaded_file_id, "file_name": file_name})
+                    else:
+                        log_event("drive_upload_fail", request_id, info, {"file_name": file_name})
+                finally:
+                    if tmp_path and os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+
+            elif message_type == "sticker":
+                sticker_id = msg.get("stickerId", "")
+                rows_to_write.append([taiwan_time, user_id, user_name, f"sticker id: {sticker_id}", new_user_flag])
+                safe_append_rows(sheet, rows_to_write)
+
+            elif message_type == "file":
+                file_name = msg.get("fileName", "")
+                if file_name and file_name.lower().endswith(".pdf"):
+                    rows_to_write.append([taiwan_time, user_id, user_name, f"pdf: {file_name}", new_user_flag])
+                    safe_append_rows(sheet, rows_to_write)
+
+                    class_name, std_name = get_class_std_from_user_id(user_id)
+                    save_name = f"{class_name}_{std_name}_{file_name}" if class_name and std_name else file_name
+
+                    tmp_path = None
+                    try:
+                        tmp_path = download_line_content_to_tempfile(message_id, suffix=".pdf")
+                        with open(tmp_path, "rb") as f:
+                            uploaded_pdf_id = upload_file_to_drive(f, save_name, mimetype="application/pdf")
+                        if uploaded_pdf_id:
+                            log_event("drive_upload_ok", request_id, info, {"drive_file_id": uploaded_pdf_id, "file_name": save_name})
+                        else:
+                            log_event("drive_upload_fail", request_id, info, {"file_name": save_name})
+                    finally:
+                        if tmp_path and os.path.exists(tmp_path):
+                            os.remove(tmp_path)
+
+            log_event("event_worker_ok", request_id, info)
+
+        except Exception as e:
+            log_event("event_worker_error", request_id, info, {"error": str(e)})
+        finally:
+            EVENT_Q.task_done()
+
+_WORKER_STARTED = False
+def ensure_worker_started():
+    global _WORKER_STARTED
+    if _WORKER_STARTED:
+        return
+    t = threading.Thread(target=event_worker, daemon=True)
+    t.start()
+    _WORKER_STARTED = True
+    print("[worker] started")
+
 # 建一個有重試的 Session（全域共用）
 session = requests.Session()
 retry = Retry(
@@ -574,9 +735,11 @@ def notify_messages():
 @app.route("/", methods=["POST"])
 def linebot():
     body = request.get_data(as_text=True)
-    request_id = uuid.uuid4().hex[:8]  # 短 id 好看
+    request_id = uuid.uuid4().hex[:8]
 
     try:
+        ensure_worker_started()
+
         json_data = json.loads(body)
         events = json_data.get("events", []) or []
 
@@ -589,67 +752,15 @@ def linebot():
 
         for event in events:
             info = extract_event_info(event)
-            log_event("event_start", request_id, info)
+            log_event("event_enqueued", request_id, info)
 
+            # queue 滿了要明確記錄，否則會默默丟失
             try:
-                # ✅ 你原本處理 event 的程式碼放這裡
-                user_id = event["source"]["userId"]
-                message_type = event["message"].get("type", "")
-                message_id = event["message"].get("id", "")
-
-                taiwan_tz = pytz.timezone("Asia/Taipei")
-                taiwan_time = datetime.datetime.now(taiwan_tz).strftime("%Y-%m-%d %H:%M:%S")
-
-                new_user_flag = "new" if is_new_user(user_id) else ""
-                user_name = get_user_name(user_id)
-
-                if message_type == "text":
-                    message_text = event["message"].get("text", "")
-                    safe_append_row(sheet, [taiwan_time, user_id, user_name, message_text, new_user_flag])
-
-                elif message_type == "image":
-                    safe_append_row(sheet, [taiwan_time, user_id, user_name, f"image id: {message_id}", new_user_flag])
-
-                    class_name, std_name = get_class_std_from_user_id(user_id)
-                    file_name = f"{class_name}_{std_name}_{message_id}.jpg" if class_name and std_name else f"{message_id}.jpg"
-
-                    message_content = line_bot_api.get_message_content(message_id)
-                    image_data = io.BytesIO(message_content.content)
-
-                    uploaded_file_id = upload_image_to_drive(image_data, file_name)
-                    if uploaded_file_id:
-                        print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
-
-                elif message_type == "sticker":
-                    sticker_id = event["message"].get("stickerId", "")
-                    safe_append_row(sheet, [taiwan_time, user_id, user_name, f"sticker id: {sticker_id}", new_user_flag])
-
-                elif message_type == "file":
-                    file_name = event["message"].get("fileName", "")
-                    if file_name and file_name.lower().endswith(".pdf"):
-                        safe_append_row(sheet, [taiwan_time, user_id, user_name, f"pdf: {file_name}", new_user_flag])
-
-                        message_content = line_bot_api.get_message_content(message_id)
-                        pdf_bytes = io.BytesIO(message_content.content)
-
-                        class_name, std_name = get_class_std_from_user_id(user_id)
-                        save_name = f"{class_name}_{std_name}_{file_name}" if class_name and std_name else file_name
-
-                        uploaded_pdf_id = upload_file_to_drive(pdf_bytes, save_name, mimetype='application/pdf')
-                        if uploaded_pdf_id:
-                            print(f"PDF 已上傳到 Google Drive: {uploaded_pdf_id}")
-                            
-                log_event("event_ok", request_id, info)
-
+                EVENT_Q.put_nowait((request_id, event))
             except Exception as e:
-                log_event("event_error", request_id, info, {"error": str(e)})
-                continue
+                log_event("queue_full_drop", request_id, info, {"error": str(e)})
 
-        print(json.dumps({
-            "tag": "webhook_done",
-            "request_id": request_id,
-            "tw_time": now_tw_str()
-        }, ensure_ascii=False))
+        # ✅ 關鍵：立刻回 200，避免 gunicorn timeout 造成整批事件中斷
         return "OK", 200
 
     except Exception as e:
@@ -659,6 +770,7 @@ def linebot():
             "tw_time": now_tw_str(),
             "error": str(e)
         }, ensure_ascii=False))
+        # 解析失敗也回 200（避免 LINE 一直重送炸你）
         return "OK", 200
 
 @app.route("/lecture", methods=["GET"])

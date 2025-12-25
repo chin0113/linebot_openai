@@ -20,6 +20,8 @@ import time
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import socket
+socket.setdefaulttimeout(20)  # 20 秒還拿不到回應就丟 timeout
 
 # 建一個有重試的 Session（全域共用）
 session = requests.Session()
@@ -511,123 +513,73 @@ def notify_messages():
 @app.route("/", methods=["POST"])
 def linebot():
     body = request.get_data(as_text=True)
-    signature = request.headers.get("X-Line-Signature")
 
-    def process_request():
-        try:
-            json_data = json.loads(body)
-            print(f"收到的 JSON: {json.dumps(json_data, indent=2)}")  # Debugging
+    try:
+        json_data = json.loads(body)
+        events = json_data.get("events", [])
+        if not events:
+            return "OK", 200
 
-            if "events" in json_data:
-                for event in json_data["events"]:  # 遍歷所有事件
-                    print(f"處理事件: {event}")  # Debugging
+        for event in events:
+            try:
+                # ✅ 你原本每個 event 的處理內容，原封不動放這裡
+                user_id = event["source"]["userId"]
+                message_type = event["message"].get("type", "")
+                message_id = event["message"].get("id", "")
 
-                    user_id = event["source"]["userId"]
-                    message_type = event["message"].get("type", "")
-                    message_id = event["message"].get("id", "")
+                taiwan_tz = pytz.timezone("Asia/Taipei")
+                taiwan_time = datetime.datetime.now(taiwan_tz).strftime("%Y-%m-%d %H:%M:%S")
 
-                    # 獲取台灣時間
-                    taiwan_tz = pytz.timezone("Asia/Taipei")
-                    taiwan_time = datetime.datetime.now(taiwan_tz).strftime("%Y-%m-%d %H:%M:%S")
+                new_user_flag = "new" if is_new_user(user_id) else ""
+                user_name = get_user_name(user_id)
 
-                    # 檢查是否為新使用者
-                    new_user_flag = "new" if is_new_user(user_id) else ""
-                    
-                    # 獲取 user_name
-                    user_name = get_user_name(user_id)
+                if message_type == "text":
+                    message_text = event["message"].get("text", "")
+                    safe_append_row(sheet, [taiwan_time, user_id, user_name, message_text, new_user_flag])
 
-                    # 處理文字訊息
-                    if message_type == "text":
-                        message_text = event["message"].get("text", "")
-                        print(f"收到文字訊息: {message_text}")  # Debugging
+                elif message_type == "image":
+                    safe_append_row(sheet, [taiwan_time, user_id, user_name, f"image id: {message_id}", new_user_flag])
 
-                        try:
-                            # 存入 Google Sheet（包含 user_name）
-                            safe_append_row(sheet, [taiwan_time, user_id, user_name, message_text, new_user_flag])
-                            print("文字訊息成功寫入 Google Sheet")
-                        except Exception as sheet_error:
-                            print(f"寫入 Google Sheet 失敗: {sheet_error}")
+                    class_name, std_name = get_class_std_from_user_id(user_id)
+                    file_name = f"{class_name}_{std_name}_{message_id}.jpg" if class_name and std_name else f"{message_id}.jpg"
 
-                    # 處理圖片訊息
-                    elif message_type == "image":
-                        print(f"收到圖片訊息: {message_id}")  # Debugging
+                    message_content = line_bot_api.get_message_content(message_id)
+                    image_data = io.BytesIO(message_content.content)
 
-                        try:
-                            safe_append_row(sheet, [taiwan_time, user_id, user_name, f"image id: {message_id}", new_user_flag])
-                            print("圖片訊息成功寫入 Google Sheet")
-                        except Exception as sheet_error:
-                            print(f"寫入 Google Sheet 失敗: {sheet_error}")
+                    uploaded_file_id = upload_image_to_drive(image_data, file_name)
+                    if uploaded_file_id:
+                        print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
 
-                        # 獲取 class 和 std
-                        class_name, std_name = get_class_std_from_user_id(user_id)
-                        file_name = f"{class_name}_{std_name}_{message_id}.jpg" if class_name and std_name else f"{message_id}.jpg"
+                elif message_type == "sticker":
+                    sticker_id = event["message"].get("stickerId", "")
+                    safe_append_row(sheet, [taiwan_time, user_id, user_name, f"sticker id: {sticker_id}", new_user_flag])
 
-                        # 下載圖片內容
+                elif message_type == "file":
+                    file_name = event["message"].get("fileName", "")
+                    if file_name and file_name.lower().endswith(".pdf"):
+                        safe_append_row(sheet, [taiwan_time, user_id, user_name, f"pdf: {file_name}", new_user_flag])
+
                         message_content = line_bot_api.get_message_content(message_id)
-                        image_data = io.BytesIO(message_content.content)
+                        pdf_bytes = io.BytesIO(message_content.content)
 
-                        # 上傳圖片到 Google Drive
-                        uploaded_file_id = upload_image_to_drive(image_data, file_name)
-                        if uploaded_file_id:
-                            print(f"圖片已上傳到 Google Drive: {uploaded_file_id}")
-                            # send_email(file_name)
-                        else:
-                            print("圖片上傳失敗")
+                        class_name, std_name = get_class_std_from_user_id(user_id)
+                        save_name = f"{class_name}_{std_name}_{file_name}" if class_name and std_name else file_name
 
-                        # 檢查檔名是否包含「女」
-                        #if "女" in file_name:
-                        #    send_email(file_name, "")  # 發送郵件
+                        uploaded_pdf_id = upload_file_to_drive(pdf_bytes, save_name, mimetype='application/pdf')
+                        if uploaded_pdf_id:
+                            print(f"PDF 已上傳到 Google Drive: {uploaded_pdf_id}")
 
-                    # 處理貼圖訊息
-                    elif message_type == "sticker":
-                        sticker_id = event["message"].get("stickerId", "")
-                        print(f"收到貼圖訊息: Sticker ID {sticker_id}")  # Debugging
+            except Exception as e:
+                # ✅ 單一 event 壞掉，不影響同一包其他 event
+                print(f"[event error] {e} | event={event}")
+                continue
 
-                        try:
-                            safe_append_row(sheet, [taiwan_time, user_id, user_name, f"sticker id: {sticker_id}", new_user_flag])
-                            print("貼圖訊息成功寫入 Google Sheet")
-                        except Exception as sheet_error:
-                            print(f"寫入 Google Sheet 失敗: {sheet_error}")
+        # ✅ 不管內部成功與否，都要快速回 200，避免 LINE 重送 + 避免 worker 被拖死
+        return "OK", 200
 
-                     # 處理 PDF（LINE 會以 type="file" 傳送）
-                    elif message_type == "file":
-                        file_name = event["message"].get("fileName", "")
-                        file_size = event["message"].get("fileSize", 0)
-
-                        # 只處理 PDF
-                        if file_name and file_name.lower().endswith(".pdf"):
-                            print(f"收到 PDF 檔案: {file_name} (size: {file_size})")
-
-                            # 記錄到 Google Sheet
-                            try:
-                                safe_append_row(sheet, [taiwan_time, user_id, user_name, f"pdf: {file_name}", new_user_flag])
-                                print("PDF 訊息成功寫入 Google Sheet")
-                            except Exception as sheet_error:
-                                print(f"寫入 Google Sheet 失敗: {sheet_error}")
-
-                            # 下載檔案內容
-                            message_content = line_bot_api.get_message_content(message_id)
-                            pdf_bytes = io.BytesIO(message_content.content)
-
-                            # 依照你圖片的命名規則，帶上班級與學生名稱（若有）
-                            class_name, std_name = get_class_std_from_user_id(user_id)
-                            save_name = f"{class_name}_{std_name}_{file_name}" if class_name and std_name else file_name
-
-                            # 上傳到與圖片相同的資料夾
-                            uploaded_pdf_id = upload_file_to_drive(pdf_bytes, save_name, mimetype='application/pdf')
-                            if uploaded_pdf_id:
-                                print(f"PDF 已上傳到 Google Drive: {uploaded_pdf_id}")
-                            else:
-                                print("PDF 上傳失敗")
-                return "OK"
-            else:
-                print("沒有事件需要處理")
-                return "No Event", 200
-        except Exception as e:
-            print(f"發生未預期的錯誤: {e}")
-            raise e  # 讓 retry_function 捕捉錯誤並重試
-    
-    return retry_function(process_request)
+    except Exception as e:
+        print(f"[webhook parse error] {e}")
+        return "OK", 200
 
 @app.route("/lecture", methods=["GET"])
 def send_lecture_links():

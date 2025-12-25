@@ -22,6 +22,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import socket
 socket.setdefaulttimeout(20)  # 20 秒還拿不到回應就丟 timeout
+import uuid
 
 # 建一個有重試的 Session（全域共用）
 session = requests.Session()
@@ -332,6 +333,66 @@ def check_image_exists(url: str) -> bool:
 
     return False
     
+TW_TZ = pytz.timezone("Asia/Taipei")
+
+def now_tw_str():
+    return datetime.datetime.now(TW_TZ).strftime("%Y-%m-%d %H:%M:%S")
+
+def extract_event_info(event: dict) -> dict:
+    msg = event.get("message", {}) or {}
+    src = event.get("source", {}) or {}
+    delivery = event.get("deliveryContext", {}) or {}
+
+    info = {
+        "tw_time": now_tw_str(),  # 你 server 接到的台灣時間
+        "timestamp_ms": event.get("timestamp"),  # LINE event timestamp (ms)
+        "webhookEventId": event.get("webhookEventId"),
+        "isRedelivery": delivery.get("isRedelivery"),
+        "mode": event.get("mode"),
+        "source_type": src.get("type"),
+        "userId": src.get("userId"),             # ✅ 你要的 LINE userId
+        "groupId": src.get("groupId"),
+        "roomId": src.get("roomId"),
+        "event_type": event.get("type"),
+        "message_type": msg.get("type"),
+        "message_id": msg.get("id"),
+    }
+
+    # 文字內容（注意：可能含個資，若你不想記錄可註解）
+    if msg.get("type") == "text":
+        info["text"] = msg.get("text", "")
+
+    # 圖片多張（imageSet）
+    if msg.get("type") == "image":
+        image_set = msg.get("imageSet")
+        if image_set:
+            info["imageSetId"] = image_set.get("id")
+            info["imageIndex"] = image_set.get("index")
+            info["imageTotal"] = image_set.get("total")
+
+    # 檔案
+    if msg.get("type") == "file":
+        info["fileName"] = msg.get("fileName")
+        info["fileSize"] = msg.get("fileSize")
+
+    # 貼圖
+    if msg.get("type") == "sticker":
+        info["stickerId"] = msg.get("stickerId")
+        info["packageId"] = msg.get("packageId")
+
+    return info
+
+def log_event(tag: str, request_id: str, info: dict, extra: dict | None = None):
+    payload = {
+        "tag": tag,
+        "request_id": request_id,
+        **info,
+    }
+    if extra:
+        payload.update(extra)
+    # 一行 JSON：最適合 Render log 搜尋與比對
+    print(json.dumps(payload, ensure_ascii=False))
+
 @app.route("/", methods=["GET"])
 def keep_alive():
     return "OK", 200
@@ -513,16 +574,25 @@ def notify_messages():
 @app.route("/", methods=["POST"])
 def linebot():
     body = request.get_data(as_text=True)
+    request_id = uuid.uuid4().hex[:8]  # 短 id 好看
 
     try:
         json_data = json.loads(body)
-        events = json_data.get("events", [])
-        if not events:
-            return "OK", 200
+        events = json_data.get("events", []) or []
+
+        print(json.dumps({
+            "tag": "webhook_received",
+            "request_id": request_id,
+            "tw_time": now_tw_str(),
+            "events_count": len(events)
+        }, ensure_ascii=False))
 
         for event in events:
+            info = extract_event_info(event)
+            log_event("event_start", request_id, info)
+
             try:
-                # ✅ 你原本每個 event 的處理內容，原封不動放這裡
+                # ✅ 你原本處理 event 的程式碼放這裡
                 user_id = event["source"]["userId"]
                 message_type = event["message"].get("type", "")
                 message_id = event["message"].get("id", "")
@@ -568,17 +638,27 @@ def linebot():
                         uploaded_pdf_id = upload_file_to_drive(pdf_bytes, save_name, mimetype='application/pdf')
                         if uploaded_pdf_id:
                             print(f"PDF 已上傳到 Google Drive: {uploaded_pdf_id}")
+                            
+                log_event("event_ok", request_id, info)
 
             except Exception as e:
-                # ✅ 單一 event 壞掉，不影響同一包其他 event
-                print(f"[event error] {e} | event={event}")
+                log_event("event_error", request_id, info, {"error": str(e)})
                 continue
 
-        # ✅ 不管內部成功與否，都要快速回 200，避免 LINE 重送 + 避免 worker 被拖死
+        print(json.dumps({
+            "tag": "webhook_done",
+            "request_id": request_id,
+            "tw_time": now_tw_str()
+        }, ensure_ascii=False))
         return "OK", 200
 
     except Exception as e:
-        print(f"[webhook parse error] {e}")
+        print(json.dumps({
+            "tag": "webhook_parse_error",
+            "request_id": request_id,
+            "tw_time": now_tw_str(),
+            "error": str(e)
+        }, ensure_ascii=False))
         return "OK", 200
 
 @app.route("/lecture", methods=["GET"])

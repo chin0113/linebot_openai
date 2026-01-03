@@ -31,6 +31,173 @@ import tempfile
 EVENT_Q = Queue(maxsize=1000)
 SHEET_LOCK = threading.Lock()
 
+# =========================
+# (A) 新增：送訊息背景工作佇列（給 /send 用）
+# =========================
+JOB_Q = Queue(maxsize=200)
+JOBS = {}
+JOBS_LOCK = threading.Lock()
+
+_JOB_WORKER_STARTED = False
+JOBS_TTL_SEC = 6 * 3600  # 只保留 6 小時內的 job，避免記憶體一直長
+
+def _gc_jobs(now_ts: float):
+    # 清掉過期 job
+    expired = []
+    for jid, info in JOBS.items():
+        ts = info.get("_ts")
+        if ts and (now_ts - ts) > JOBS_TTL_SEC:
+            expired.append(jid)
+    for jid in expired:
+        JOBS.pop(jid, None)
+
+def set_job(job_id: str, **kwargs):
+    now_ts = time.time()
+    with JOBS_LOCK:
+        _gc_jobs(now_ts)
+        prev = JOBS.get(job_id, {})
+        JOBS[job_id] = {
+            **prev,
+            **kwargs,
+            "updated_at": now_tw_str(),
+            "_ts": prev.get("_ts", now_ts),  # job 建立時間（for TTL）
+        }
+
+def job_worker():
+    while True:
+        job = JOB_Q.get()
+        job_id = job["job_id"]
+        try:
+            set_job(job_id, status="running", started_at=now_tw_str())
+
+            if job["type"] == "send":
+                _do_send(job["std_class"], job["title"], job_id)
+            elif job["type"] == "notify":
+                _do_notify(job["payload"], job_id)  # 你未來若要把 /notify 也改背景再用
+
+            set_job(job_id, status="done", finished_at=now_tw_str())
+        except Exception as e:
+            set_job(job_id, status="error", error=str(e), finished_at=now_tw_str())
+        finally:
+            JOB_Q.task_done()
+
+def ensure_job_worker_started():
+    global _JOB_WORKER_STARTED
+    if _JOB_WORKER_STARTED:
+        return
+    t = threading.Thread(target=job_worker, daemon=True)
+    t.start()
+    _JOB_WORKER_STARTED = True
+    print("[job_worker] started")
+
+# =========================
+# (B) /send 的重活搬到這裡跑（背景 worker 執行）
+# =========================
+def _do_send(std_class: str, title: str, job_id: str):
+    set_job(job_id, progress="loading_sheet", std_class=std_class, title=title)
+
+    print(f"\n[job:{job_id}] 即將傳送給班級：{std_class}，主題：{title}")
+
+    text_message = TextSendMessage(
+        text="【作文評語】\n親愛的家長，您好！附檔為芷瑢老師批閱後的作文評語（也有同步mail回信給孩子），還請孩子詳細看過並了解問題點，老師上課會進行總檢討，也同時讓家長掌握孩子的學習成果，謝謝您！"
+    )
+
+    # 讀 sheet（加鎖：你程式本來就有 SHEET_LOCK）
+    with SHEET_LOCK:
+        records = mail_sheet.get_all_records()
+
+    scanned = 0
+    matched = 0
+    sent_ok = 0
+    sent_fail = 0
+    skipped = 0
+
+    for row in records:
+        scanned += 1
+
+        class_name = str(row.get('class', '')).strip()
+        if class_name != std_class:
+            continue
+        matched += 1
+
+        send_image = str(row.get('hw', '')).strip().lower() == 'y'
+        send_text  = str(row.get('txt', '')).strip().lower() == 'y'
+        if not (send_image or send_text):
+            skipped += 1
+            continue
+
+        id_field = str(row.get('id', '')).strip()
+        user_ids = [uid.strip() for uid in id_field.split(',')] if ',' in id_field else ([id_field] if id_field else [])
+        name = str(row.get('name', '')).strip()
+        if not (user_ids and name):
+            skipped += 1
+            continue
+
+        enc_name  = urllib.parse.quote(name)
+        enc_class = urllib.parse.quote(std_class)
+        enc_title = urllib.parse.quote(title)
+
+        image_url     = f"https://bizbear.cc/composition/{enc_class}/{enc_title}/orig/{enc_name}.jpg"
+        image_url_pre = f"https://bizbear.cc/composition/{enc_class}/{enc_title}/pre/{enc_name}.jpg"
+
+        # 需要圖片但圖片不可用 → 略過此學生（文字也不送）
+        if send_image:
+            image_ok = check_image_exists(image_url)
+            if not image_ok:
+                print(f"[job:{job_id}] [skip student] 圖片不可用 → 略過 {name}: {image_url}")
+                skipped += 1
+                # 每 20 筆更新一次 job（避免 log/lock 太頻繁）
+                if (sent_ok + sent_fail + skipped) % 20 == 0:
+                    set_job(job_id, scanned=scanned, matched=matched, sent_ok=sent_ok, sent_fail=sent_fail, skipped=skipped, last=name)
+                continue
+
+        image_message = None
+        if send_image:
+            image_message = ImageSendMessage(
+                original_content_url=image_url,
+                preview_image_url=image_url_pre
+            )
+
+        for user_id in user_ids:
+            if not user_id:
+                continue
+
+            messages = []
+
+            # 若不需要圖片、但要文字 → 只送文字
+            if send_text and (not send_image):
+                messages.append(text_message)
+
+            # 若需要圖片（且已確認可用）→ 依 send_text/send_image 組裝
+            if send_image:
+                if send_text:
+                    messages.append(text_message)
+                messages.append(image_message)
+
+            if not messages:
+                continue
+
+            try:
+                line_bot_api.push_message(user_id, messages)
+                sent_ok += 1
+                time.sleep(0.05)  # 保留你原本的節奏
+            except Exception as e:
+                sent_fail += 1
+                print(f"[job:{job_id}] 發送訊息給 {user_id} 失敗: {e}")
+
+        if (sent_ok + sent_fail + skipped) % 20 == 0:
+            set_job(job_id, scanned=scanned, matched=matched, sent_ok=sent_ok, sent_fail=sent_fail, skipped=skipped, last=name)
+
+    set_job(
+        job_id,
+        progress="finished",
+        scanned=scanned,
+        matched=matched,
+        sent_ok=sent_ok,
+        sent_fail=sent_fail,
+        skipped=skipped,
+    )
+
 # 記錄最近處理過的事件，避免 LINE redelivery 重複寫
 # (用 dict + 時間戳，避免額外套件)
 PROCESSED = {}
@@ -564,89 +731,44 @@ def health_check():
     
 from flask import request
 
+# =========================
+# (C) /send：只排隊，立刻回應
+# =========================
 @app.route("/send", methods=["POST"])
 def send_messages():
+    ensure_job_worker_started()
+
+    data = request.get_json() or {}
+    std_class = (data.get("std_class") or "").strip()
+    title = (data.get("title") or "").strip()
+
+    if not std_class or not title:
+        return jsonify({"error": "std_class 和 title 都必須提供"}), 400
+
+    job_id = uuid.uuid4().hex[:10]
+    set_job(job_id, status="queued", type="send", std_class=std_class, title=title, created_at=now_tw_str())
+
     try:
-        data = request.get_json()
-        std_class = data.get("std_class", "").strip()
-        title = data.get("title", "").strip()
+        JOB_Q.put_nowait({"job_id": job_id, "type": "send", "std_class": std_class, "title": title})
+    except Exception:
+        set_job(job_id, status="error", error="queue_full")
+        return jsonify({"error": "queue_full"}), 503
 
-        if not std_class or not title:
-            return jsonify({"error": "std_class 和 title 都必須提供"}), 400
+    # ✅ 立刻回應，避免 gunicorn timeout
+    return jsonify({"ok": True, "job_id": job_id, "status": "queued"}), 202
 
-        print(f"\n即將傳送給班級：{std_class}，主題：{title}")
 
-        text_message = TextSendMessage(
-            text="【作文評語】\n親愛的家長，您好！附檔為芷瑢老師批閱後的作文評語（也有同步mail回信給孩子），還請孩子詳細看過並了解問題點，老師上課會進行總檢討，也同時讓家長掌握孩子的學習成果，謝謝您！"
-        )
+@app.route("/send_status/<job_id>", methods=["GET"])
+def send_status(job_id):
+    with JOBS_LOCK:
+        info = JOBS.get(job_id)
+    if not info:
+        return jsonify({"error": "job_not_found"}), 404
 
-        records = mail_sheet.get_all_records()
-
-        for row in records:
-            class_name = str(row.get('class', '')).strip()
-            if class_name != std_class:
-                continue
-
-            send_image = str(row.get('hw', '')).strip().lower() == 'y'
-            send_text  = str(row.get('txt', '')).strip().lower() == 'y'
-            if not (send_image or send_text):
-                continue
-
-            id_field = str(row.get('id', '')).strip()
-            user_ids = [uid.strip() for uid in id_field.split(',')] if ',' in id_field else ([id_field] if id_field else [])
-            name = str(row.get('name', '')).strip()
-            if not (user_ids and name):
-                continue
-
-            enc_name  = urllib.parse.quote(name)
-            enc_class = urllib.parse.quote(std_class)
-            enc_title = urllib.parse.quote(title)
-
-            image_url     = f"https://bizbear.cc/composition/{enc_class}/{enc_title}/orig/{enc_name}.jpg"
-            image_url_pre = f"https://bizbear.cc/composition/{enc_class}/{enc_title}/pre/{enc_name}.jpg"
-
-            # ---- 關鍵：若「需要圖片」，圖片不可用 → 直接略過此學生（文字也不送） ----
-            if send_image:
-                image_ok = check_image_exists(image_url)
-                if not image_ok:
-                    print(f"[skip student] 圖片不可用 → 略過 {name}（文字與圖片皆不送）: {image_url}")
-                    continue
-
-            # 構造訊息（若 send_image==True，到這裡一定 image_ok==True）
-            image_message = None
-            if send_image:
-                image_message = ImageSendMessage(
-                    original_content_url=image_url,
-                    preview_image_url=image_url_pre
-                )
-
-            for user_id in user_ids:
-                if not user_id:
-                    continue
-                messages = []
-                # 若不需要圖片、但要文字 → 只送文字
-                if send_text and (not send_image):
-                    messages.append(text_message)
-                # 若需要圖片（且已確認可用）→ 根據 send_text/sen_image 組裝
-                if send_image:
-                    if send_text:
-                        messages.append(text_message)
-                    messages.append(image_message)
-
-                if not messages:
-                    continue
-
-                try:
-                    line_bot_api.push_message(user_id, messages)
-                    time.sleep(0.05)  # 略降等待，減少整體阻塞時間
-                except Exception as e:
-                    print(f"發送訊息給 {user_id} 失敗: {e}")
-
-        return jsonify({"message": "Messages sent successfully!"}), 200
-
-    except Exception as e:
-        print(f"發生錯誤: {e}")
-        return jsonify({"error": str(e)}), 500
+    # 不回傳內部 _ts
+    info2 = dict(info)
+    info2.pop("_ts", None)
+    return jsonify(info2), 200
 
 @app.route("/notify", methods=["POST"])
 def notify_messages():

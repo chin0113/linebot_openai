@@ -773,11 +773,22 @@ def send_status(job_id):
 @app.route("/notify", methods=["POST"])
 def notify_messages():
     try:
-        data = request.get_json()
-        image_names_raw = data.get("image_names", "").strip()
-        #message_text = data.get("message_text", "").strip()
-        message_texts = [t.strip() for t in data.get("message_texts", []) if t.strip()]
-        order = data.get("order", "text-first")
+        data = request.get_json() or {}
+
+        image_names_raw = str(data.get("image_names", "")).strip()
+
+        raw_message_texts = data.get("message_texts", [])
+        if not isinstance(raw_message_texts, list):
+            return jsonify({"error": "message_texts 必須是陣列"}), 400
+
+        message_texts = [
+            str(t).strip()
+            for t in raw_message_texts
+            if str(t).strip()
+        ]
+
+        order = str(data.get("order", "text-first")).strip()
+        hw_value = str(data.get("hw_value", "y")).strip().lower()
 
         send_text = bool(message_texts)
         send_image = bool(image_names_raw)
@@ -785,70 +796,159 @@ def notify_messages():
         if not send_text and not send_image:
             return jsonify({"error": "請至少提供圖片名稱或文字訊息"}), 400
 
-        #image_names = [name.strip() for name in image_names_raw.split(',') if name.strip()] if send_image else []
-        image_names = [urllib.parse.unquote(name.strip()) for name in image_names_raw.split(',') if name.strip()] if send_image else []
+        if hw_value not in ("y", "a", "b"):
+            return jsonify({"error": "hw_value 只允許 y、a、b"}), 400
 
-        #text_message = TextSendMessage(text=message_text) if send_text else None
-        text_messages = [TextSendMessage(text=t) for t in message_texts]
+        if order not in ("text-first", "image-first"):
+            return jsonify({
+                "error": "order 只允許 text-first 或 image-first"
+            }), 400
 
-        # ✅ 圖片存在性檢查（統一一次性驗證）
+        image_names = [
+            urllib.parse.unquote(name.strip())
+            for name in image_names_raw.split(",")
+            if name.strip()
+        ] if send_image else []
+
+        text_messages = [
+            TextSendMessage(text=t)
+            for t in message_texts
+        ]
+
+        # 圖片存在性檢查
         if send_image:
             for img_name in image_names:
                 encoded_img_name = urllib.parse.quote(img_name)
-                image_url = f"https://bizbear.cc/composition/notify/orig/{encoded_img_name}"
+                image_url = (
+                    "https://bizbear.cc/composition/notify/orig/"
+                    f"{encoded_img_name}"
+                )
+
+                image_exists = False
+
                 for i in range(2):
                     try:
-                        response = requests.head(image_url, timeout=3)
-                        if response.status_code == 200:
-                            break
-                    except Exception as e:
-                        print(f"檢查圖片失敗 {i+1} 次：{e}")
-                    if i == 1:
-                        print(f"❌ 終止：圖片不存在 - {image_url}")
-                        return jsonify({"error": f"圖片不存在：{img_name}"}), 400
-                    time.sleep(1)
+                        response = requests.head(
+                            image_url,
+                            timeout=3,
+                            allow_redirects=True
+                        )
 
-        # ✅ 確保圖片都存在後，才發送訊息
-        records = mail_sheet.get_all_records()
+                        if response.status_code == 200:
+                            image_exists = True
+                            break
+
+                    except Exception as e:
+                        print(f"檢查圖片失敗 {i + 1} 次：{e}")
+
+                    if i == 0:
+                        time.sleep(1)
+
+                if not image_exists:
+                    print(f"❌ 終止：圖片不存在 - {image_url}")
+                    return jsonify({
+                        "error": f"圖片不存在：{img_name}"
+                    }), 400
+
+        # 讀取試算表
+        with SHEET_LOCK:
+            records = mail_sheet.get_all_records()
+
+        matched_rows = 0
+        target_count = 0
+        sent_count = 0
+        failed_count = 0
+        skipped_count = 0
+
         for row in records:
-            if str(row.get('hw', '')).strip().lower() != 'y':
+            row_hw = str(row.get("hw", "")).strip().lower()
+
+            if row_hw != hw_value:
                 continue
 
-            id_field = str(row.get('id', '')).strip()
-            if ',' in id_field:
-                user_ids = [uid.strip() for uid in id_field.split(',')]
+            matched_rows += 1
+
+            id_field = str(row.get("id", "")).strip()
+
+            if "," in id_field:
+                user_ids = [
+                    uid.strip()
+                    for uid in id_field.split(",")
+                    if uid.strip()
+                ]
             else:
                 user_ids = [id_field] if id_field else []
 
+            if not user_ids:
+                skipped_count += 1
+                continue
+
             image_messages = []
+
             if send_image:
                 for img_name in image_names:
                     encoded_img_name = urllib.parse.quote(img_name)
-                    image_url = f"https://bizbear.cc/composition/notify/orig/{encoded_img_name}"
-                    image_url_pre = f"https://bizbear.cc/composition/notify/pre/{encoded_img_name}"
-                    image_messages.append(ImageSendMessage(
-                        original_content_url=image_url,
-                        preview_image_url=image_url_pre
-                    ))
+
+                    image_url = (
+                        "https://bizbear.cc/composition/notify/orig/"
+                        f"{encoded_img_name}"
+                    )
+
+                    image_url_pre = (
+                        "https://bizbear.cc/composition/notify/pre/"
+                        f"{encoded_img_name}"
+                    )
+
+                    image_messages.append(
+                        ImageSendMessage(
+                            original_content_url=image_url,
+                            preview_image_url=image_url_pre
+                        )
+                    )
 
             for user_id in user_ids:
-                user_id = user_id.strip()
-                if user_id:
-                    messages = []
-                    if order == "text-first":
-                        messages.extend(text_messages)     # 多段文字
-                        messages.extend(image_messages)
-                    else:
-                        messages.extend(image_messages)
-                        messages.extend(text_messages)     # 多段文字
+                target_count += 1
 
-                    if messages:
-                        try:
-                            line_bot_api.push_message(user_id, messages)
-                        except Exception as e:
-                            print(f"發送給 {user_id} 失敗：{e}")
+                messages = []
 
-        return jsonify({"message": "Notify messages sent!"}), 200
+                if order == "text-first":
+                    messages.extend(text_messages)
+                    messages.extend(image_messages)
+                else:
+                    messages.extend(image_messages)
+                    messages.extend(text_messages)
+
+                if not messages:
+                    skipped_count += 1
+                    continue
+
+                try:
+                    line_bot_api.push_message(user_id, messages)
+                    sent_count += 1
+                    time.sleep(0.05)
+
+                except Exception as e:
+                    failed_count += 1
+                    print(f"發送給 {user_id} 失敗：{e}")
+
+        print(
+            f"通知發送完成：hw={hw_value}，"
+            f"符合資料列={matched_rows}，"
+            f"目標帳號={target_count}，"
+            f"成功={sent_count}，"
+            f"失敗={failed_count}，"
+            f"略過={skipped_count}"
+        )
+
+        return jsonify({
+            "message": "Notify messages sent!",
+            "hw_value": hw_value,
+            "matched_rows": matched_rows,
+            "target_count": target_count,
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+            "skipped_count": skipped_count
+        }), 200
 
     except Exception as e:
         print(f"❌ notify 發生錯誤：{e}")

@@ -315,22 +315,120 @@ def event_worker():
 
             elif message_type == "file":
                 file_name = msg.get("fileName", "")
-                if file_name and file_name.lower().endswith(".pdf"):
-                    rows_to_write.append([taiwan_time, user_id, user_name, f"pdf: {file_name}", new_user_flag])
+                file_name_lower = file_name.lower()
+
+                # PDF
+                if file_name and file_name_lower.endswith(".pdf"):
+                    rows_to_write.append([
+                        taiwan_time,
+                        user_id,
+                        user_name,
+                        f"pdf: {file_name}",
+                        new_user_flag
+                    ])
                     safe_append_rows(sheet, rows_to_write)
 
                     class_name, std_name = get_class_std_from_user_id(user_id)
-                    save_name = f"{class_name}_{std_name}_{file_name}" if class_name and std_name else file_name
+                    save_name = (
+                        f"{class_name}_{std_name}_{file_name}"
+                        if class_name and std_name
+                        else file_name
+                    )
 
                     tmp_path = None
                     try:
-                        tmp_path = download_line_content_to_tempfile(message_id, suffix=".pdf")
+                        tmp_path = download_line_content_to_tempfile(
+                            message_id,
+                            suffix=".pdf"
+                        )
+
                         with open(tmp_path, "rb") as f:
-                            uploaded_pdf_id = upload_file_to_drive(f, save_name, mimetype="application/pdf")
+                            uploaded_pdf_id = upload_file_to_drive(
+                                f,
+                                save_name,
+                                mimetype="application/pdf"
+                            )
+
                         if uploaded_pdf_id:
-                            log_event("drive_upload_ok", request_id, info, {"drive_file_id": uploaded_pdf_id, "file_name": save_name})
+                            log_event(
+                                "drive_upload_ok",
+                                request_id,
+                                info,
+                                {
+                                    "drive_file_id": uploaded_pdf_id,
+                                    "file_name": save_name
+                                }
+                            )
                         else:
-                            log_event("drive_upload_fail", request_id, info, {"file_name": save_name})
+                            log_event(
+                                "drive_upload_fail",
+                                request_id,
+                                info,
+                                {"file_name": save_name}
+                            )
+
+                    finally:
+                        if tmp_path and os.path.exists(tmp_path):
+                            os.remove(tmp_path)
+
+                # 圖片用「檔案」方式傳送
+                elif file_name and file_name_lower.endswith((".jpg", ".jpeg", ".png")):
+                    rows_to_write.append([
+                        taiwan_time,
+                        user_id,
+                        user_name,
+                        f"image file: {file_name}",
+                        new_user_flag
+                    ])
+                    safe_append_rows(sheet, rows_to_write)
+
+                    class_name, std_name = get_class_std_from_user_id(user_id)
+                    save_name = (
+                        f"{class_name}_{std_name}_{file_name}"
+                        if class_name and std_name
+                        else file_name
+                    )
+
+                    # 保留原本副檔名
+                    suffix = os.path.splitext(file_name)[1]
+
+                    if file_name_lower.endswith(".png"):
+                        mimetype = "image/png"
+                    else:
+                        mimetype = "image/jpeg"
+
+                    tmp_path = None
+                    try:
+                        tmp_path = download_line_content_to_tempfile(
+                            message_id,
+                            suffix=suffix
+                        )
+
+                        with open(tmp_path, "rb") as f:
+                            uploaded_image_id = upload_file_to_drive(
+                                f,
+                                save_name,
+                                mimetype=mimetype
+                            )
+
+                        if uploaded_image_id:
+                            log_event(
+                                "drive_upload_ok",
+                                request_id,
+                                info,
+                                {
+                                    "drive_file_id": uploaded_image_id,
+                                    "file_name": save_name
+                                }
+                            )
+                        else:
+                            log_event(
+                                "drive_upload_fail",
+                                request_id,
+                                info,
+                                {"file_name": save_name}
+                            )
+
                     finally:
                         if tmp_path and os.path.exists(tmp_path):
                             os.remove(tmp_path)

@@ -1120,7 +1120,7 @@ def send_lecture_links():
                     message2 = TextSendMessage(
                         text=(
                             "確認無誤後，請按「確認送出」：\n\n"
-                            f"https://bizbear.cc/address-form.php?code={code}&v=2"
+                            f"https://iread327form.lovestoblog.com/address-form.php?code={code}&v=2"
                         )
                     )
 

@@ -137,8 +137,8 @@ def _do_send(std_class: str, title: str, job_id: str):
         enc_class = urllib.parse.quote(std_class)
         enc_title = urllib.parse.quote(title)
 
-        image_url     = f"https://iread327form.lovestoblog.com/composition/{enc_class}/{enc_title}/orig/{enc_name}.jpg"
-        image_url_pre = f"https://iread327form.lovestoblog.com/composition/{enc_class}/{enc_title}/pre/{enc_name}.jpg"
+        image_url     = f"https://bizbear.cc/composition/{enc_class}/{enc_title}/orig/{enc_name}.jpg"
+        image_url_pre = f"https://bizbear.cc/composition/{enc_class}/{enc_title}/pre/{enc_name}.jpg"
 
         # 需要圖片但圖片不可用 → 略過此學生（文字也不送）
         if send_image:

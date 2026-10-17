@@ -23,6 +23,8 @@ from urllib3.util.retry import Retry
 import socket
 socket.setdefaulttimeout(20)  # 20 秒還拿不到回應就丟 timeout
 import uuid
+import secrets
+import re
 
 from queue import Queue
 import threading
@@ -72,6 +74,8 @@ def job_worker():
 
             if job["type"] == "send":
                 _do_send(job["std_class"], job["title"], job_id)
+            elif job["type"] == "lecture":
+                _do_lecture(job["payload"], job_id)
             elif job["type"] == "notify":
                 _do_notify(job["payload"], job_id)  # 你未來若要把 /notify 也改背景再用
 
@@ -1093,47 +1097,111 @@ def linebot():
         # 解析失敗也回 200（避免 LINE 一直重送炸你）
         return "OK", 200
 
-@app.route("/lecture", methods=["GET"])
-def send_lecture_links():
-    try:
-        # 開啟目標試算表
-        lecture_sheet = gc.open_by_key("14TwhcFFfW3B4323jWcdAIaOoGey6Qk8p2pdw0j0-UwE").sheet1
-        rows = lecture_sheet.get_all_values()
+# ==========================================
+# 講義地址調查：只接受授權 POST，不允許公開 GET 觸發群發
+# 管理文字由 KnownHost / InfinityFree PHP 提供
+# ==========================================
+LECTURE_REQUESTS = {}
+LECTURE_REQUESTS_LOCK = threading.Lock()
+LECTURE_FORM_URL = "https://iread327form.lovestoblog.com/address-form.php"
+LECTURE_SHEET_ID = "14TwhcFFfW3B4323jWcdAIaOoGey6Qk8p2pdw0j0-UwE"
 
-        for row in rows:
-            if len(row) >= 9:
-                user_id = row[0].strip()
-                class_info = row[1].strip()
-                code = row[7].strip()
-                send_flag = row[8].strip().lower()
 
-                if "線上" in class_info and user_id and code and send_flag == "y":
-                    # 第一段訊息
-                    message1 = TextSendMessage(
-                        text=(
-                            "【請確認講義收件地址】\n"
-                            "親愛的家長，您好！為郵寄秋冬班線上課程講義，我們將以「掛號」形式寄出（預計7/31，寄出後會訊息通知），收件者為學生姓名，麻煩點選以下連結確認地址，謝謝您。～行政組～"
-                        )
-                    )
+def lecture_authorized():
+    expected = os.getenv("LECTURE_API_KEY", "")
+    supplied = request.headers.get("X-Lecture-Key", "")
+    return len(expected) >= 32 and secrets.compare_digest(expected, supplied)
 
-                    # 第二段訊息
-                    message2 = TextSendMessage(
-                        text=(
-                            "確認無誤後，請按「確認送出」：\n\n"
-                            f"https://iread327form.lovestoblog.com/address-form.php?code={code}&v=2"
-                        )
-                    )
 
-                    try:
-                        line_bot_api.push_message(user_id, [message1, message2])
-                        print(f"✅ 已發送訊息給 {user_id}")
-                    except Exception as e:
-                        print(f"❌ 發送訊息給 {user_id} 失敗: {e}")
+def lecture_recipients():
+    # 完全保留原本欄位規則：A=user ID、B=班級、H=code、I=send_flag
+    with SHEET_LOCK:
+        rows = gc.open_by_key(LECTURE_SHEET_ID).sheet1.get_all_values()
+    targets = []
+    for row in rows:
+        if len(row) < 9:
+            continue
+        user_id, class_info, code, flag = row[0].strip(), row[1].strip(), row[7].strip(), row[8].strip().lower()
+        if "線上" in class_info and user_id and code and flag == "y":
+            targets.append((user_id, code))
+    return targets
 
-        return "Lecture links sent!", 200
-    except Exception as e:
-        print(f"/lecture 發生錯誤: {e}")
-        return "Error", 500
+
+def _do_lecture(payload: dict, job_id: str):
+    targets = lecture_recipients()
+    sent_ok, sent_fail = 0, 0
+    set_job(job_id, progress="sending", eligible_count=len(targets), sent_ok=0, sent_fail=0)
+    for user_id, code in targets:
+        # 安全地把個別 code 放在 query string，連結只由伺服器產生
+        url = LECTURE_FORM_URL + "?code=" + urllib.parse.quote(code, safe="") + "&v=2"
+        second = payload["message2"].replace("{{url}}", url)
+        if len(second) > 5000:
+            sent_fail += 1
+            continue
+        try:
+            line_bot_api.push_message(user_id, [
+                TextSendMessage(text=payload["message1"]),
+                TextSendMessage(text=second),
+            ])
+            sent_ok += 1
+            time.sleep(0.05)
+        except Exception as e:
+            sent_fail += 1
+            print(f"[lecture:{job_id}] LINE push failed: {type(e).__name__}", flush=True)
+        if (sent_ok + sent_fail) % 10 == 0:
+            set_job(job_id, sent_ok=sent_ok, sent_fail=sent_fail)
+    set_job(job_id, sent_ok=sent_ok, sent_fail=sent_fail, progress="finished")
+    print(f"[lecture:{job_id}] finished: eligible={len(targets)}, ok={sent_ok}, fail={sent_fail}", flush=True)
+    if sent_fail:
+        raise RuntimeError(f"Partially sent: {sent_fail} failures; review before retrying")
+
+
+@app.route("/lecture", methods=["GET", "POST"])
+def lecture_dispatch():
+    if request.method == "GET":
+        return jsonify({"error": "GET sending disabled. Use authenticated PHP management page."}), 405
+    if not lecture_authorized():
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    mode = str(data.get("mode", "")).strip()
+    a = str(data.get("message1", "")).strip()
+    b = str(data.get("message2", "")).strip()
+    if mode not in ("preview", "send") or not a or not b or "{{url}}" not in b or len(a) > 4000 or len(b) > 4000:
+        return jsonify({"error": "Invalid message template; message2 must include {{url}}"}), 400
+    if mode == "preview":
+        try:
+            targets = lecture_recipients()
+            return jsonify({"eligible_count": len(targets)}), 200
+        except Exception as e:
+            print(f"[lecture] preview failed: {type(e).__name__}", flush=True)
+            return jsonify({"error": "Unable to read recipient list"}), 503
+    request_key = str(data.get("request_key", ""))
+    if not re.fullmatch(r"[a-f0-9]{32}", request_key):
+        return jsonify({"error": "Invalid request_key"}), 400
+    ensure_job_worker_started()
+    with LECTURE_REQUESTS_LOCK:
+        if request_key in LECTURE_REQUESTS:
+            return jsonify({"ok": True, "job_id": LECTURE_REQUESTS[request_key], "status": "already_queued"}), 202
+        if JOB_Q.full():
+            return jsonify({"error": "queue_full"}), 503
+        jid = uuid.uuid4().hex[:10]
+        set_job(jid, type="lecture", status="queued", created_at=now_tw_str())
+        LECTURE_REQUESTS[request_key] = jid
+        JOB_Q.put_nowait({"job_id": jid, "type": "lecture", "payload": {"message1": a, "message2": b}})
+    return jsonify({"ok": True, "job_id": jid, "status": "queued"}), 202
+
+
+@app.route("/lecture_status/<job_id>", methods=["GET"])
+def lecture_status(job_id):
+    if not lecture_authorized():
+        return jsonify({"error": "unauthorized"}), 401
+    with JOBS_LOCK:
+        data = dict(JOBS.get(job_id, {}))
+    if not data or data.get("type") != "lecture":
+        return jsonify({"error": "job_not_found_or_expired"}), 404
+    data.pop("_ts", None)
+    return jsonify(data), 200
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)

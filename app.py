@@ -25,6 +25,9 @@ socket.setdefaulttimeout(20)  # 20 秒還拿不到回應就丟 timeout
 import uuid
 import secrets
 import re
+import hashlib
+import hmac
+import unicodedata
 
 from queue import Queue
 import threading
@@ -94,6 +97,53 @@ def ensure_job_worker_started():
     _JOB_WORKER_STARTED = True
     print("[job_worker] started")
 
+# ==========================================================
+# Cloudflare R2 作文圖片來源切換（只影響 /send，不影響 /notify）
+# COMPOSITION_IMAGE_PROVIDER 預設 knownhost，測試成功再於 Render 設成 r2。
+# R2_PATH_SECRET 請設於 Render 的 Environment，必須與本機上傳程式相同。
+# ==========================================================
+COMPOSITION_IMAGE_PROVIDER = os.getenv("COMPOSITION_IMAGE_PROVIDER", "knownhost").strip().lower()
+R2_PATH_SECRET = os.getenv("R2_PATH_SECRET", "")
+R2_IMAGE_BASE_URL = "https://iread327-images.iread327.workers.dev"
+
+
+def r2_private_token(*parts):
+    """完全對齊 PDF轉JPG_R2完整上傳.py 的 private_token()。"""
+    if len(R2_PATH_SECRET.encode("utf-8")) < 32:
+        raise RuntimeError("R2_PATH_SECRET 尚未於 Render 環境變數設定（至少 32 bytes）。")
+    content = "\x00".join(
+        unicodedata.normalize("NFC", str(part).strip()) for part in parts
+    ).encode("utf-8")
+    return hmac.new(
+        R2_PATH_SECRET.encode("utf-8"), content, hashlib.sha256
+    ).hexdigest()[:32]
+
+
+def composition_image_urls(std_class, title, name):
+    """回傳 (orig_url, pre_url)；切換來源但保留發送順序及訊息邏輯。"""
+    if COMPOSITION_IMAGE_PROVIDER == "r2":
+        batch_id = r2_private_token("batch", std_class, title)
+        student_id = r2_private_token("student", std_class, title, name)
+        root = f"{R2_IMAGE_BASE_URL}/composition/v1/{batch_id}"
+        return (
+            f"{root}/orig/{student_id}.jpg",
+            f"{root}/pre/{student_id}.jpg",
+        )
+
+    if COMPOSITION_IMAGE_PROVIDER == "knownhost":
+        enc_class = urllib.parse.quote(std_class)
+        enc_title = urllib.parse.quote(title)
+        enc_name = urllib.parse.quote(name)
+        return (
+            f"https://bizbear.cc/composition/{enc_class}/{enc_title}/orig/{enc_name}.jpg",
+            f"https://bizbear.cc/composition/{enc_class}/{enc_title}/pre/{enc_name}.jpg",
+        )
+
+    raise RuntimeError(
+        "COMPOSITION_IMAGE_PROVIDER 僅接受 knownhost 或 r2。"
+    )
+
+
 # =========================
 # (B) /send 的重活搬到這裡跑（背景 worker 執行）
 # =========================
@@ -137,12 +187,8 @@ def _do_send(std_class: str, title: str, job_id: str):
             skipped += 1
             continue
 
-        enc_name  = urllib.parse.quote(name)
-        enc_class = urllib.parse.quote(std_class)
-        enc_title = urllib.parse.quote(title)
-
-        image_url     = f"https://bizbear.cc/composition/{enc_class}/{enc_title}/orig/{enc_name}.jpg"
-        image_url_pre = f"https://bizbear.cc/composition/{enc_class}/{enc_title}/pre/{enc_name}.jpg"
+        # 其他 LINE 發送邏輯維持不變；只切換兩張圖片的來源 URL。
+        image_url, image_url_pre = composition_image_urls(std_class, title, name)
 
         # 需要圖片但圖片不可用 → 略過此學生（文字也不送）
         if send_image:

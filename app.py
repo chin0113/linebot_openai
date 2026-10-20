@@ -106,6 +106,9 @@ COMPOSITION_IMAGE_PROVIDER = os.getenv("COMPOSITION_IMAGE_PROVIDER", "knownhost"
 R2_PATH_SECRET = os.getenv("R2_PATH_SECRET", "")
 R2_IMAGE_BASE_URL = "https://iread327-images.iread327.workers.dev"
 
+# 通知圖片來源開關：預設保持舊主機，完成 R2 實測後再設 r2
+NOTIFY_IMAGE_PROVIDER = os.getenv("NOTIFY_IMAGE_PROVIDER", "knownhost").strip().lower()
+
 
 def r2_private_token(*parts):
     """完全對齊 PDF轉JPG_R2完整上傳.py 的 private_token()。"""
@@ -142,6 +145,31 @@ def composition_image_urls(std_class, title, name):
     raise RuntimeError(
         "COMPOSITION_IMAGE_PROVIDER 僅接受 knownhost 或 r2。"
     )
+
+
+def notify_image_urls(image_name: str):
+    """沿用 /notify 的圖片名稱輸入方式，僅切換原圖與縮圖來源。"""
+    if NOTIFY_IMAGE_PROVIDER == "knownhost":
+        encoded_name = urllib.parse.quote(image_name)
+        return (
+            f"https://bizbear.cc/composition/notify/orig/{encoded_name}",
+            f"https://bizbear.cc/composition/notify/pre/{encoded_name}",
+        )
+
+    if NOTIFY_IMAGE_PROVIDER == "r2":
+        # 與 Windows notify_R2_upload.py 完全相同的 HMAC 規則。
+        # 使用原始完整檔名（含副檔名）計算，避免不同格式相互覆蓋。
+        file_name = unicodedata.normalize("NFC", image_name.strip())
+        if not file_name or "/" in file_name or "\\" in file_name or "\x00" in file_name:
+            raise ValueError("R2 通知圖片名稱不可包含路徑分隔字元")
+        ext = os.path.splitext(file_name)[1].lower()
+        if ext not in (".jpg", ".jpeg", ".png"):
+            raise ValueError("R2 通知圖片只支援 JPG、JPEG、PNG")
+        image_id = r2_private_token("notify", file_name)
+        base = f"{R2_IMAGE_BASE_URL}/composition/notify/v1/{image_id}"
+        return f"{base}/orig{ext}", f"{base}/pre{ext}"
+
+    raise RuntimeError("NOTIFY_IMAGE_PROVIDER 僅接受 knownhost 或 r2")
 
 
 # =========================
@@ -966,11 +994,7 @@ def notify_messages():
         # 圖片存在性檢查
         if send_image:
             for img_name in image_names:
-                encoded_img_name = urllib.parse.quote(img_name)
-                image_url = (
-                    "https://bizbear.cc/composition/notify/orig/"
-                    f"{encoded_img_name}"
-                )
+                image_url, image_url_pre = notify_image_urls(img_name)
 
                 image_exists = False
 
@@ -1035,17 +1059,7 @@ def notify_messages():
 
             if send_image:
                 for img_name in image_names:
-                    encoded_img_name = urllib.parse.quote(img_name)
-
-                    image_url = (
-                        "https://bizbear.cc/composition/notify/orig/"
-                        f"{encoded_img_name}"
-                    )
-
-                    image_url_pre = (
-                        "https://bizbear.cc/composition/notify/pre/"
-                        f"{encoded_img_name}"
-                    )
+                    image_url, image_url_pre = notify_image_urls(img_name)
 
                     image_messages.append(
                         ImageSendMessage(
